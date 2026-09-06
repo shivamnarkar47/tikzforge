@@ -6,7 +6,6 @@ use std::fs;
 use std::io::Read;
 use std::path::PathBuf;
 use std::process::Command;
-use tauri::Manager;
 
 #[derive(Serialize)]
 struct CompileResult {
@@ -38,45 +37,10 @@ fn resolve_tex_path(path: &str) -> Result<PathBuf, String> {
     Ok(dir.join(file_name))
 }
 
-/// Resolve which pdflatex binary to use. Prefers the bundled TeX Live
-/// (shipped as a Tauri resource), then falls back to PATH + known locations.
-fn resolve_pdflatex(handle: &tauri::AppHandle) -> PathBuf {
-    let platform = texlive_resolver::current_platform();
-    if texlive_resolver::is_bundled(platform) {
-        if let Ok(resource_dir) = handle.path().resource_dir() {
-            let bundled = texlive_resolver::bundled_pdflatex_path(&resource_dir.into(), platform);
-            if bundled.is_file() {
-                return bundled;
-            }
-        }
-    }
-
-    // Fallback: PATH + well-known install locations.
-    if let Some(paths) = std::env::var_os("PATH") {
-        for dir in std::env::split_paths(&paths) {
-            let candidate = dir.join("pdflatex");
-            if candidate.is_file() {
-                return candidate;
-            }
-        }
-    }
-    for fallback in [
-        PathBuf::from("/usr/bin/pdflatex"),
-        PathBuf::from("/usr/local/bin/pdflatex"),
-        PathBuf::from("/Library/TeX/texbin/pdflatex"),
-        PathBuf::from("C:\\texlive\\2025\\bin\\win32\\pdflatex.exe"),
-    ] {
-        if fallback.is_file() {
-            return fallback;
-        }
-    }
-
-    // Nothing found — return the bundled path so the error message points to it.
-    handle
-        .path()
-        .resource_dir()
-        .map(|d| texlive_resolver::bundled_pdflatex_path(&d.into(), platform))
-        .unwrap_or_else(|_| PathBuf::from("pdflatex"))
+/// Resolve which engine to use. Prefers the bundled engine (Tectonic on
+/// Windows, pdflatex on Linux), then falls back to PATH.
+fn resolve_engine(handle: &tauri::AppHandle) -> texlive_resolver::Engine {
+    texlive_resolver::resolve_engine(handle)
 }
 
 #[tauri::command]
@@ -93,13 +57,25 @@ fn compile_tex(handle: tauri::AppHandle, path: String, content: String) -> Resul
         .map(|n| n.to_string_lossy().into_owned())
         .unwrap_or_else(|| "untitled.tex".to_string());
 
-    let pdflatex = resolve_pdflatex(&handle);
-    let output = Command::new(&pdflatex)
-        .args(["-interaction=nonstopmode", "-shell-escape", "-synctex=1"])
-        .arg(&file_name)
-        .current_dir(&dir)
-        .output()
-        .map_err(|e| format!("Failed to run {}: {e}", pdflatex.display()))?;
+    let engine = resolve_engine(&handle);
+    let output = match &engine {
+        texlive_resolver::Engine::Tectonic(tectonic) => {
+            // Tectonic is self-contained: it handles its own dependency
+            // downloads and produces a single-pass PDF. No -synctex needed.
+            Command::new(tectonic)
+                .arg(&file_name)
+                .current_dir(&dir)
+                .output()
+        }
+        texlive_resolver::Engine::PdfLatex(pdflatex) => {
+            Command::new(pdflatex)
+                .args(["-interaction=nonstopmode", "-shell-escape", "-synctex=1"])
+                .arg(&file_name)
+                .current_dir(&dir)
+                .output()
+        }
+    }
+    .map_err(|e| format!("Failed to run engine: {e}"))?;
 
     let log = String::from_utf8_lossy(&output.stdout).into_owned();
     let stem = tex_path
@@ -112,14 +88,18 @@ fn compile_tex(handle: tauri::AppHandle, path: String, content: String) -> Resul
     Ok(CompileResult { pdf, log, success })
 }
 
-/// Report the bundled pdflatex path if it exists, else fall back to PATH.
+/// Report the bundled engine path if it exists, else fall back to PATH.
 #[tauri::command]
-fn detect_pdflatex(handle: tauri::AppHandle) -> Option<String> {
-    let path = resolve_pdflatex(&handle);
-    if path.is_file() {
-        Some(path.to_string_lossy().into_owned())
-    } else {
-        None
+fn detect_engine(handle: tauri::AppHandle) -> Option<String> {
+    match resolve_engine(&handle) {
+        texlive_resolver::Engine::Tectonic(path)
+        | texlive_resolver::Engine::PdfLatex(path) => {
+            if path.is_file() {
+                Some(path.to_string_lossy().into_owned())
+            } else {
+                None
+            }
+        }
     }
 }
 
@@ -159,7 +139,7 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             greet,
             compile_tex,
-            detect_pdflatex,
+            detect_engine,
             read_synctex,
             check_update
         ])

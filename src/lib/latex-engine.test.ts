@@ -19,7 +19,7 @@ describe("detectInstallation", () => {
     const result = await detectInstallation();
 
     expect(result).toEqual({ detected: true, path: "/usr/bin/pdflatex" });
-    expect(invoke).toHaveBeenCalledWith("detect_pdflatex");
+    expect(invoke).toHaveBeenCalledWith("detect_engine");
   });
 
   it("returns detected=false when no pdflatex found", async () => {

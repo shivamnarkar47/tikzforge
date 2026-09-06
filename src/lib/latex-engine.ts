@@ -7,7 +7,7 @@ export interface DetectionResult {
 
 export async function detectInstallation(): Promise<DetectionResult> {
   try {
-    const path = await invoke<string | null>("detect_pdflatex");
+    const path = await invoke<string | null>("detect_engine");
     return { detected: path !== null, path };
   } catch {
     return { detected: false, path: null };

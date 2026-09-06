@@ -129,63 +129,31 @@ PROFILE
 }
 
 prepare_windows() {
-  local dest="$STAGE_DIR/windows/bin/win32"
+  local dest="$STAGE_DIR/tectonic"
   mkdir -p "$dest"
 
-  if [[ -f "$dest/pdflatex.exe" ]]; then
-    log "Windows pdflatex already staged at $dest/pdflatex.exe — skipping download."
+  if [[ -f "$dest/tectonic.exe" ]]; then
+    log "Tectonic already staged at $dest/tectonic.exe — skipping."
     return 0
   fi
 
-  log "Downloading minimal TeX Live ${TL_VERSION} for Windows x86_64..."
+  log "Downloading Tectonic for Windows x86_64..."
 
   local tmpdir
   tmpdir="$(mktemp -d)"
   trap 'rm -rf "$tmpdir"' RETURN
 
-  # Use the native Windows installer (.exe) — it's a self-contained binary
-  # that doesn't need Perl (unlike the Perl install-tl script).
-  curl -fsSL "https://mirror.ctan.org/systems/texlive/tlnet/install-tl-windows.exe" -o "$tmpdir/install-tl-windows.exe"
+  # Tectonic ships a single self-contained .zip per release.
+  # No TeX Live installer needed — it bundles everything.
+  curl -fsSL "https://github.com/tectonic-typesetting/tectonic/releases/latest/download/tectonic-x86_64-pc-windows-msvc.zip" \
+    -o "$tmpdir/tectonic.zip"
 
-  cat > "$tmpdir/tikzforge.profile" <<PROFILE
-selected_scheme scheme-minimal
-TEXDIR $tmpdir/texlive
-TEXMFLOCAL $tmpdir/texlive/texmf-local
-TEXMFSYSCONFIG $tmpdir/texlive/texmf-config
-TEXMFSYSVAR $tmpdir/texlive/texmf-var
-TEXMFHOME ~/texmf
-TEXMFCONFIG ~/.texlive/texmf-config
-TEXMFVAR ~/.texlive/texmf-var
-binary_win32 1
-instopt_adjustpath 0
-instopt_adjustrepo 1
-instopt_letter 0
-instopt_portable 0
-instopt_write18_restricted 1
-tlpdbopt_autobackup 0
-tlpdbopt_install_docfiles 0
-tlpdbopt_install_srcfiles 0
-PROFILE
+  unzip -q "$tmpdir/tectonic.zip" -d "$tmpdir"
 
-  log "Running installer (timeout: 30 min)..."
-  # TeX Live downloads are slow on GitHub runners — give it 30 min.
-  ( cd "$tmpdir" && timeout 1800 ./install-tl-windows.exe -no-gui -profile tikzforge.profile -repository "$TL_MIRROR" < /dev/null )
+  # Copy the binary into the staging dir.
+  find "$tmpdir" -name 'tectonic.exe' -exec cp {} "$dest/" \;
 
-  if [[ -n "$TL_PACKAGES" ]]; then
-    log "Installing additional packages: $TL_PACKAGES"
-    local tlmgr="$tmpdir/texlive/bin/win32/tlmgr"
-    # shellcheck disable=SC2086
-    "$tlmgr" install --no-auto-install --no-doc --no-src $TL_PACKAGES < /dev/null || true
-  fi
-
-  cp -a "$tmpdir/texlive/bin/win32/." "$dest/"
-
-  rm -rf "$dest/man"
-
-  mkdir -p "$STAGE_DIR/windows/texmf-dist"
-  cp -a "$tmpdir/texlive/texmf-dist/." "$STAGE_DIR/windows/texmf-dist/" 2>/dev/null || true
-
-  log "Windows bundle staged at $dest"
+  log "Windows engine (Tectonic) staged at $dest/tectonic.exe"
 }
 
 case "${1:-current}" in
