@@ -2,6 +2,17 @@ import "@testing-library/jest-dom/vitest";
 import { vi } from "vitest";
 import React from "react";
 
+// Mock window.matchMedia — not available in jsdom
+Object.defineProperty(window, "matchMedia", {
+  writable: true,
+  value: vi.fn((query: string) => ({
+    matches: false,
+    media: query,
+    addEventListener: vi.fn(),
+    removeEventListener: vi.fn(),
+  })),
+});
+
 // Mock react-resizable-panels — doesn't work in jsdom
 vi.mock("react-resizable-panels", () => {
   const createMock = (defaultClassName?: string) =>
