@@ -140,7 +140,7 @@ build_windows() {
   tmpdir="$(mktemp -d)"
   trap 'rm -rf "$tmpdir"' RETURN
 
-  curl -fsSL "$TL_MIRROR/install-tl-windows.exe" -o "$tmpdir/install-tl-windows.exe"
+  curl -fsSL "https://mirror.ctan.org/systems/texlive/tlnet/install-tl-windows.exe" -o "$tmpdir/install-tl-windows.exe"
 
   cat > "$tmpdir/tikzforge.profile" <<PROFILE
 selected_scheme scheme-minimal

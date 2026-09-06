@@ -145,7 +145,7 @@ prepare_windows() {
 
   # Use the native Windows installer (.exe) — it's a self-contained binary
   # that doesn't need Perl (unlike the Perl install-tl script).
-  curl -fsSL "$TL_MIRROR/install-tl-windows.exe" -o "$tmpdir/install-tl-windows.exe"
+  curl -fsSL "https://mirror.ctan.org/systems/texlive/tlnet/install-tl-windows.exe" -o "$tmpdir/install-tl-windows.exe"
 
   cat > "$tmpdir/tikzforge.profile" <<PROFILE
 selected_scheme scheme-minimal
