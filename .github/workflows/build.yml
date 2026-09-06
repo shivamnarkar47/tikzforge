@@ -35,27 +35,25 @@ jobs:
       - name: Install frontend dependencies
         run: bun install --frozen-lockfile
 
-      - name: Cache bundled TeX Live
+      - name: Cache bundled Tectonic engine
         uses: actions/cache@v4
         with:
-          path: |
-            src-tauri/texlive
-            src-tauri/tectonic
-          key: engine-${{ matrix.platform }}-${{ hashFiles('scripts/prepare-texlive.sh') }}
+          path: src-tauri/tectonic
+          key: tectonic-${{ matrix.platform }}-${{ hashFiles('scripts/prepare-texlive.sh') }}
           restore-keys: |
-            engine-${{ matrix.platform }}-
+            tectonic-${{ matrix.platform }}-
 
-      - name: Prepare bundled TeX Live (Linux)
+      - name: Prepare bundled Tectonic (Linux)
         if: matrix.platform == 'ubuntu-latest'
-        timeout-minutes: 30
+        timeout-minutes: 15
         run: bash scripts/prepare-texlive.sh linux
 
-      - name: Prepare bundled TeX Live (Windows)
+      - name: Prepare bundled Tectonic (Windows)
         if: matrix.platform == 'windows-latest'
-        timeout-minutes: 45
+        timeout-minutes: 15
         run: bash scripts/prepare-texlive.sh windows
 
-      - name: Generate Tauri config with TeX Live resources
+      - name: Generate Tauri config with Tectonic resource
         run: bash scripts/generate-tauri-config.sh --force
 
       - name: Build

@@ -8,32 +8,21 @@ pub enum Platform {
     MacOS,
 }
 
-/// The LaTeX engine TikzForge bundles for a platform.
-pub enum Engine {
-    /// Traditional pdflatex binary.
-    PdfLatex(PathBuf),
-    /// Self-contained Tectonic binary (no separate TeX Live needed).
-    Tectonic(PathBuf),
+/// The bundled engine: Tectonic is self-contained on all platforms.
+pub struct Engine {
+    pub path: PathBuf,
 }
 
 /// Pure resolver: given the Tauri resource directory and a platform, return
-/// the absolute path where the bundled engine is expected to live.
+/// the absolute path where the bundled Tectonic binary is expected to live.
 ///
-/// Linux:   `<resource_dir>/texlive/linux/bin/x86_64-linux/pdflatex`
-/// Windows: `<resource_dir>/tectonic/tectonic.exe`
-/// macOS:   `<resource_dir>/texlive/macos/bin/universal-darwin/pdflatex`
+/// All platforms: `<resource_dir>/tectonic/tectonic[.exe]`
 pub fn bundled_engine_path(resource_dir: &PathBuf, platform: Platform) -> PathBuf {
-    match platform {
-        Platform::Linux => resource_dir
-            .join("texlive")
-            .join("linux/bin/x86_64-linux")
-            .join("pdflatex"),
-        Platform::Windows => resource_dir.join("tectonic").join("tectonic.exe"),
-        Platform::MacOS => resource_dir
-            .join("texlive")
-            .join("macos/bin/universal-darwin")
-            .join("pdflatex"),
-    }
+    let exe_name = match platform {
+        Platform::Windows => "tectonic.exe",
+        _ => "tectonic",
+    };
+    resource_dir.join("tectonic").join(exe_name)
 }
 
 /// Returns true if TikzForge ships a bundled engine for this platform.
@@ -60,17 +49,17 @@ pub fn resolve_engine(handle: &tauri::AppHandle) -> Engine {
         if let Ok(resource_dir) = handle.path().resource_dir() {
             let path = bundled_engine_path(&resource_dir.into(), platform);
             if path.is_file() {
-                return match platform {
-                    Platform::Windows => Engine::Tectonic(path),
-                    _ => Engine::PdfLatex(path),
-                };
+                return Engine { path };
             }
         }
     }
     // Fallback for dev / non-bundled builds.
-    match platform {
-        Platform::Windows => Engine::Tectonic("tectonic".into()),
-        _ => Engine::PdfLatex("pdflatex".into()),
+    let exe_name = match platform {
+        Platform::Windows => "tectonic.exe",
+        _ => "tectonic",
+    };
+    Engine {
+        path: exe_name.into(),
     }
 }
 
@@ -98,14 +87,11 @@ mod tests {
     fn bundled_path_linux() {
         let dir = PathBuf::from("/app/resources");
         let path = bundled_engine_path(&dir, Platform::Linux);
-        assert_eq!(
-            path,
-            Path::new("/app/resources/texlive/linux/bin/x86_64-linux/pdflatex")
-        );
+        assert_eq!(path, Path::new("/app/resources/tectonic/tectonic"));
     }
 
     #[test]
-    fn bundled_path_windows_tectonic() {
+    fn bundled_path_windows() {
         let dir = PathBuf::from("C:\\resources");
         let path = bundled_engine_path(&dir, Platform::Windows);
         let expected_suffix = ["tectonic", "tectonic.exe"];
@@ -113,16 +99,6 @@ mod tests {
         let tail: Vec<_> = tail.into_iter().rev().map(|c| c.as_os_str()).collect();
         assert_eq!(tail, expected_suffix);
         assert!(path.ends_with("tectonic/tectonic.exe"));
-    }
-
-    #[test]
-    fn bundled_path_macos() {
-        let dir = PathBuf::from("/app/resources");
-        let path = bundled_engine_path(&dir, Platform::MacOS);
-        assert_eq!(
-            path,
-            Path::new("/app/resources/texlive/macos/bin/universal-darwin/pdflatex")
-        );
     }
 
     #[test]

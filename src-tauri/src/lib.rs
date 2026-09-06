@@ -37,8 +37,7 @@ fn resolve_tex_path(path: &str) -> Result<PathBuf, String> {
     Ok(dir.join(file_name))
 }
 
-/// Resolve which engine to use. Prefers the bundled engine (Tectonic on
-/// Windows, pdflatex on Linux), then falls back to PATH.
+/// Resolve which engine to use. Tectonic on all platforms.
 fn resolve_engine(handle: &tauri::AppHandle) -> texlive_resolver::Engine {
     texlive_resolver::resolve_engine(handle)
 }
@@ -58,24 +57,13 @@ fn compile_tex(handle: tauri::AppHandle, path: String, content: String) -> Resul
         .unwrap_or_else(|| "untitled.tex".to_string());
 
     let engine = resolve_engine(&handle);
-    let output = match &engine {
-        texlive_resolver::Engine::Tectonic(tectonic) => {
-            // Tectonic is self-contained: it handles its own dependency
-            // downloads and produces a single-pass PDF. No -synctex needed.
-            Command::new(tectonic)
-                .arg(&file_name)
-                .current_dir(&dir)
-                .output()
-        }
-        texlive_resolver::Engine::PdfLatex(pdflatex) => {
-            Command::new(pdflatex)
-                .args(["-interaction=nonstopmode", "-shell-escape", "-synctex=1"])
-                .arg(&file_name)
-                .current_dir(&dir)
-                .output()
-        }
-    }
-    .map_err(|e| format!("Failed to run engine: {e}"))?;
+    // Tectonic is self-contained: handles its own dependency downloads and
+    // produces a single-pass PDF. No -synctex or -shell-escape flags needed.
+    let output = Command::new(&engine.path)
+        .arg(&file_name)
+        .current_dir(&dir)
+        .output()
+        .map_err(|e| format!("Failed to run Tectonic: {e}"))?;
 
     let log = String::from_utf8_lossy(&output.stdout).into_owned();
     let stem = tex_path
@@ -91,15 +79,11 @@ fn compile_tex(handle: tauri::AppHandle, path: String, content: String) -> Resul
 /// Report the bundled engine path if it exists, else fall back to PATH.
 #[tauri::command]
 fn detect_engine(handle: tauri::AppHandle) -> Option<String> {
-    match resolve_engine(&handle) {
-        texlive_resolver::Engine::Tectonic(path)
-        | texlive_resolver::Engine::PdfLatex(path) => {
-            if path.is_file() {
-                Some(path.to_string_lossy().into_owned())
-            } else {
-                None
-            }
-        }
+    let engine = resolve_engine(&handle);
+    if engine.path.is_file() {
+        Some(engine.path.to_string_lossy().into_owned())
+    } else {
+        None
     }
 }
 
