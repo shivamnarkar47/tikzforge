@@ -14,4 +14,17 @@ describe("Editor", () => {
     const content = document.querySelector(".cm-content");
     expect(content?.textContent).toContain("documentclass{article}");
   });
+
+  it("applies LaTeX syntax highlighting to commands", () => {
+    render(<Editor value="\\documentclass{article}" onChange={() => {}} />);
+    // CodeMirror wraps highlighted tokens in spans with hashed class names
+    const highlightedSpans = document.querySelectorAll(".cm-content span");
+    expect(highlightedSpans.length).toBeGreaterThan(0);
+  });
+
+  it("highlights comments", () => {
+    render(<Editor value="% This is a comment" onChange={() => {}} />);
+    const highlightedSpans = document.querySelectorAll(".cm-content span");
+    expect(highlightedSpans.length).toBeGreaterThan(0);
+  });
 });
