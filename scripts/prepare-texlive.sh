@@ -38,12 +38,11 @@ prepare_linux() {
   tmpdir="$(mktemp -d)"
   trap 'rm -rf "$tmpdir"' RETURN
 
-  # Use Tectonic's official installer. It downloads the binary and
-  # installs to $PREFIX/bin. We set PREFIX to our temp dir.
-  curl --proto '=https' --tlsv1.2 -fsSL https://drop-sh.fullyjustified.net | \
-    PREFIX="$tmpdir" sh -s -- --prefix "$tmpdir"
+  # Tectonic's drop-sh installer extracts the binary into the current
+  # directory. Run it from the temp dir, then copy the binary out.
+  ( cd "$tmpdir" && curl --proto '=https' --tlsv1.2 -fsSL https://drop-sh.fullyjustified.net | sh )
 
-  find "$tmpdir" -name 'tectonic' -type f -exec cp {} "$dest/" \;
+  cp "$tmpdir/tectonic" "$dest/tectonic"
   chmod +x "$dest/tectonic"
 
   log "Linux engine (Tectonic) staged at $dest/tectonic"
