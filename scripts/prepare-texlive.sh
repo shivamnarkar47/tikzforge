@@ -167,10 +167,9 @@ tlpdbopt_install_docfiles 0
 tlpdbopt_install_srcfiles 0
 PROFILE
 
-  log "Running installer (timeout: 15 min)..."
-  # -no-gui: batch mode. < /dev/null: force EOF so the installer never
-  # waits for stdin (which would hang the CI job).
-  ( cd "$tmpdir" && timeout 900 ./install-tl-windows.exe -no-gui -profile tikzforge.profile -repository "$TL_MIRROR" < /dev/null )
+  log "Running installer (timeout: 30 min)..."
+  # TeX Live downloads are slow on GitHub runners — give it 30 min.
+  ( cd "$tmpdir" && timeout 1800 ./install-tl-windows.exe -no-gui -profile tikzforge.profile -repository "$TL_MIRROR" < /dev/null )
 
   if [[ -n "$TL_PACKAGES" ]]; then
     log "Installing additional packages: $TL_PACKAGES"
