@@ -51,6 +51,7 @@ A native desktop app where you open a `.tex` file, edit it, and see the PDF upda
 
 ### Frontend Stack
 - **React + TypeScript + Tailwind CSS**
+- **shadcn/ui** — component library built on Radix UI + Tailwind, CSS-variable theming, dark/light mode out of the box
 - **CodeMirror 6** — lighter than Monaco (~200KB vs ~5MB), faster startup, sufficient for LaTeX editing
 - **PDF.js** — consistent cross-platform rendering, no extra architectural cost since the UI is already web-based
 
@@ -103,6 +104,7 @@ A native desktop app where you open a `.tex` file, edit it, and see the PDF upda
 - On launch, detect unclean shutdown and offer to restore
 
 ### Theme
+- **shadcn/ui** CSS-variable theming with dark/light mode out of the box
 - Follows system dark/light setting by default
 - User can override; choice persisted
 
