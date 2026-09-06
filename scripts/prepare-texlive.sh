@@ -83,7 +83,10 @@ prepare_linux() {
   tmpdir="$(mktemp -d)"
   trap 'rm -rf "$tmpdir"' RETURN
 
-  curl -fsSL "$TL_MIRROR/install-tl-unx.tar.gz" | tar -xz -C "$tmpdir"
+  # Use the direct TUG FTP mirror — mirror.ctan.org redirects to random
+  # mirrors (like mirror.clarkson.edu) that may be down or slow.
+  # --retry 3 handles transient network failures on CI.
+  curl -fsSL --retry 3 --retry-delay 5 "https://ftp.tug.org/texlive/tlnet/install-tl-unx.tar.gz" | tar -xz -C "$tmpdir"
   local installer
   installer="$(find "$tmpdir" -maxdepth 2 -type d -name 'install-tl-*' | head -1)"
 
