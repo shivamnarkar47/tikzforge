@@ -144,8 +144,9 @@ prepare_windows() {
   trap 'rm -rf "$tmpdir"' RETURN
 
   # Tectonic ships a single self-contained .zip per release.
-  # No TeX Live installer needed — it bundles everything.
-  curl -fsSL "https://github.com/tectonic-typesetting/tectonic/releases/latest/download/tectonic-x86_64-pc-windows-msvc.zip" \
+  # Pin a specific version — the "latest" redirect sometimes 404s on GitHub
+  # Actions runners due to rate limiting.
+  curl -fsSL "https://github.com/tectonic-typesetting/tectonic/releases/download/tectonic%400.17.0/tectonic-0.17.0-x86_64-pc-windows-msvc.zip" \
     -o "$tmpdir/tectonic.zip"
 
   unzip -q "$tmpdir/tectonic.zip" -d "$tmpdir"
