@@ -108,4 +108,24 @@ describe("useCompile", () => {
 
     expect(useDocumentStore.getState().compilationErrors).toEqual([]);
   });
+
+  it("surfaces invoke failures as errors instead of throwing", async () => {
+    vi.mocked(compileDocument).mockRejectedValue(
+      new Error(
+        "Compilation requires the Tauri desktop app — you are running in a browser preview."
+      )
+    );
+
+    const { result } = renderHook(() => useCompile());
+
+    await act(async () => {
+      await result.current.compile("/path/doc.tex", "content");
+    });
+
+    const state = useDocumentStore.getState();
+    expect(state.isCompiling).toBe(false);
+    expect(state.pdfData).toBeNull();
+    expect(state.compilationErrors).toHaveLength(1);
+    expect(state.compilationErrors[0].message).toContain("browser preview");
+  });
 });

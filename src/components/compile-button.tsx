@@ -1,4 +1,6 @@
 import { useDocumentStore } from "../store/document-store";
+import { Button } from "./ui/button";
+import { Loader2, Play } from "lucide-react";
 
 interface CompileButtonProps {
   onCompile: () => void;
@@ -8,21 +10,18 @@ export function CompileButton({ onCompile }: CompileButtonProps) {
   const { isCompiling } = useDocumentStore();
 
   return (
-    <button
-      onClick={onCompile}
-      disabled={isCompiling}
-      className="px-4 py-2 bg-primary text-primary-foreground rounded-md disabled:opacity-50 flex items-center gap-2"
-    >
+    <Button onClick={onCompile} disabled={isCompiling} size="sm">
       {isCompiling ? (
         <>
-          <span data-testid="compile-spinner" className="animate-spin">
-            ⏳
-          </span>
+          <Loader2 data-testid="compile-spinner" className="animate-spin" />
           Compiling...
         </>
       ) : (
-        "Compile"
+        <>
+          <Play />
+          Compile
+        </>
       )}
-    </button>
+    </Button>
   );
 }

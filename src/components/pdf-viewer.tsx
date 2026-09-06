@@ -22,8 +22,11 @@ export function PdfViewer({ pdfData }: PdfViewerProps) {
 
   if (!url) {
     return (
-      <div className="pdf-viewer flex items-center justify-center h-full text-muted-foreground">
-        No PDF loaded
+      <div className="pdf-viewer flex h-full flex-col items-center justify-center gap-2 bg-muted/30 p-6 text-center">
+        <p className="text-sm font-medium">No PDF loaded</p>
+        <p className="text-xs text-muted-foreground">
+          Press Compile to build your document and preview it here.
+        </p>
       </div>
     );
   }

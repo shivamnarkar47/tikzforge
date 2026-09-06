@@ -23,6 +23,11 @@ export function useCompile() {
         setCompilationErrors(errors);
         setPdfData(null);
       }
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      setCompilationLog(message);
+      setCompilationErrors([{ file: path, line: 1, message }]);
+      setPdfData(null);
     } finally {
       setCompiling(false);
     }

@@ -166,6 +166,7 @@ Tests verify external behavior, not implementation details. A test passes if the
 - Tectonic or other LaTeX engine alternatives
 - MiKTeX detection on Windows
 - E2E UI tests
+- Bundled minimal TeX Live (300MB) for Linux/Windows is "out of scope" for v0.1 — replaced by on-first-launch download with progress (story 22). Re-bundling as a v0.1 ticket: see issue #<new>
 - Flatpak or .deb distribution
 - Custom app icon
 

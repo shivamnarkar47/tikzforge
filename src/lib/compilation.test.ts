@@ -5,6 +5,11 @@ vi.mock("@tauri-apps/api/core", () => ({
   invoke: vi.fn(),
 }));
 
+// Tests run inside Tauri in production; pretend we are in Tauri.
+vi.mock("../lib/tauri", () => ({
+  isTauri: () => true,
+}));
+
 import { invoke } from "@tauri-apps/api/core";
 import { compileDocument } from "../lib/compilation";
 
