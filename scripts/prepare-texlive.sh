@@ -193,5 +193,5 @@ case "${1:-current}" in
     ;;
 esac
 
-log "Done. Staged tree:"
-find "$STAGE_DIR" -type f | head -20
+log "Done. Sample of staged tree:"
+find "$STAGE_DIR" -type f 2>/dev/null | head -20 || true
