@@ -1,0 +1,4 @@
+# Pre-built TeX Live tarballs (built once, extracted by CI)
+# Build locally:  ./scripts/build-texlive-tarball.sh linux|windows
+# Commit via LFS: git lfs install && git add scripts/texlive-*.tar.gz
+*.tar.gz filter=lfs diff=lfs merge=lfs -text
