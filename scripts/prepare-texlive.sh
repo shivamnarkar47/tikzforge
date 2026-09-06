@@ -107,7 +107,7 @@ tlpdbopt_install_docfiles 0
 tlpdbopt_install_srcfiles 0
 PROFILE
 
-  ( cd "$installer" && ./install-tl -profile "$tmpdir/tikzforge.profile" -repository "$TL_MIRROR" )
+  ( cd "$installer" && timeout 900 ./install-tl -no-gui -profile "$tmpdir/tikzforge.profile" -repository "$TL_MIRROR" )
 
   if [[ -n "$TL_PACKAGES" ]]; then
     log "Installing additional packages: $TL_PACKAGES"
@@ -143,7 +143,17 @@ prepare_windows() {
   tmpdir="$(mktemp -d)"
   trap 'rm -rf "$tmpdir"' RETURN
 
-  curl -fsSL "$TL_MIRROR/install-tl-windows.exe" -o "$tmpdir/install-tl-windows.exe"
+  # Use the self-contained zip installer (not the net-installer .exe).
+  # The zip archive works with -no-gui and doesn't prompt for input.
+  curl -fsSL "$TL_MIRROR/install-tl.zip" -o "$tmpdir/install-tl.zip"
+  unzip -q "$tmpdir/install-tl.zip" -d "$tmpdir"
+  local installer
+  installer="$(find "$tmpdir" -maxdepth 2 -type d -name 'install-tl-*' | head -1)"
+
+  if [[ -z "$installer" ]]; then
+    log "ERROR: could not find install-tl in extracted archive"
+    return 1
+  fi
 
   cat > "$tmpdir/tikzforge.profile" <<PROFILE
 selected_scheme scheme-minimal
@@ -165,7 +175,8 @@ tlpdbopt_install_docfiles 0
 tlpdbopt_install_srcfiles 0
 PROFILE
 
-  ( cd "$tmpdir" && ./install-tl-windows.exe -profile tikzforge.profile -repository "$TL_MIRROR" )
+  log "Running installer (timeout: 15 min)..."
+  ( cd "$installer" && timeout 900 ./install-tl -no-gui -profile "$tmpdir/tikzforge.profile" -repository "$TL_MIRROR" )
 
   if [[ -n "$TL_PACKAGES" ]]; then
     log "Installing additional packages: $TL_PACKAGES"
@@ -176,8 +187,6 @@ PROFILE
 
   cp -a "$tmpdir/texlive/bin/win32/." "$dest/"
 
-  # Remove man pages — they bloat the bundle and may contain symlinks that
-  # break Tauri's resource validator.
   rm -rf "$dest/man"
 
   mkdir -p "$STAGE_DIR/windows/texmf-dist"

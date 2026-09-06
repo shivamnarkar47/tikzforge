@@ -45,10 +45,12 @@ jobs:
 
       - name: Prepare bundled TeX Live (Linux)
         if: matrix.platform == 'ubuntu-latest'
+        timeout-minutes: 30
         run: bash scripts/prepare-texlive.sh linux
 
       - name: Prepare bundled TeX Live (Windows)
         if: matrix.platform == 'windows-latest'
+        timeout-minutes: 30
         run: bash scripts/prepare-texlive.sh windows
 
       - name: Generate Tauri config with TeX Live resources
