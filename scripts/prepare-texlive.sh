@@ -143,17 +143,9 @@ prepare_windows() {
   tmpdir="$(mktemp -d)"
   trap 'rm -rf "$tmpdir"' RETURN
 
-  # Use the self-contained zip installer (not the net-installer .exe).
-  # The zip archive works with -no-gui and doesn't prompt for input.
-  curl -fsSL "$TL_MIRROR/install-tl.zip" -o "$tmpdir/install-tl.zip"
-  unzip -q "$tmpdir/install-tl.zip" -d "$tmpdir"
-  local installer
-  installer="$(find "$tmpdir" -maxdepth 2 -type d -name 'install-tl-*' | head -1)"
-
-  if [[ -z "$installer" ]]; then
-    log "ERROR: could not find install-tl in extracted archive"
-    return 1
-  fi
+  # Use the native Windows installer (.exe) — it's a self-contained binary
+  # that doesn't need Perl (unlike the Perl install-tl script).
+  curl -fsSL "$TL_MIRROR/install-tl-windows.exe" -o "$tmpdir/install-tl-windows.exe"
 
   cat > "$tmpdir/tikzforge.profile" <<PROFILE
 selected_scheme scheme-minimal
@@ -176,13 +168,15 @@ tlpdbopt_install_srcfiles 0
 PROFILE
 
   log "Running installer (timeout: 15 min)..."
-  ( cd "$installer" && timeout 900 ./install-tl -no-gui -profile "$tmpdir/tikzforge.profile" -repository "$TL_MIRROR" )
+  # -no-gui: batch mode. < /dev/null: force EOF so the installer never
+  # waits for stdin (which would hang the CI job).
+  ( cd "$tmpdir" && timeout 900 ./install-tl-windows.exe -no-gui -profile tikzforge.profile -repository "$TL_MIRROR" < /dev/null )
 
   if [[ -n "$TL_PACKAGES" ]]; then
     log "Installing additional packages: $TL_PACKAGES"
     local tlmgr="$tmpdir/texlive/bin/win32/tlmgr"
     # shellcheck disable=SC2086
-    "$tlmgr" install --no-auto-install --no-doc --no-src $TL_PACKAGES || true
+    "$tlmgr" install --no-auto-install --no-doc --no-src $TL_PACKAGES < /dev/null || true
   fi
 
   cp -a "$tmpdir/texlive/bin/win32/." "$dest/"
