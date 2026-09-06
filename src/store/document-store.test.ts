@@ -11,6 +11,7 @@ describe("DocumentStore", () => {
       isCompiling: false,
       compilationErrors: [],
       compilationLog: "",
+      recentFiles: [],
     });
   });
 
@@ -70,6 +71,69 @@ describe("DocumentStore", () => {
       const errors = [{ file: "test.tex", line: 10, message: "Undefined control sequence" }];
       useDocumentStore.getState().setCompilationErrors(errors);
       expect(useDocumentStore.getState().compilationErrors).toEqual(errors);
+    });
+  });
+
+  describe("recentFiles", () => {
+    it("has empty recent files by default", () => {
+      expect(useDocumentStore.getState().recentFiles).toEqual([]);
+    });
+  });
+
+  describe("addRecentFile", () => {
+    it("adds a file to recent files", () => {
+      useDocumentStore.getState().addRecentFile("/path/to/doc.tex");
+      expect(useDocumentStore.getState().recentFiles).toEqual([
+        { path: "/path/to/doc.tex", lastOpened: expect.any(Number) },
+      ]);
+    });
+
+    it("moves existing file to top when re-added", () => {
+      useDocumentStore.getState().addRecentFile("/path/a.tex");
+      useDocumentStore.getState().addRecentFile("/path/b.tex");
+      useDocumentStore.getState().addRecentFile("/path/a.tex");
+      const recent = useDocumentStore.getState().recentFiles;
+      expect(recent[0].path).toBe("/path/a.tex");
+      expect(recent).toHaveLength(2);
+    });
+
+    it("limits recent files to 10 items", () => {
+      for (let i = 0; i < 15; i++) {
+        useDocumentStore.getState().addRecentFile(`/path/file${i}.tex`);
+      }
+      expect(useDocumentStore.getState().recentFiles.length).toBe(10);
+    });
+  });
+
+  describe("removeRecentFile", () => {
+    it("removes a file from recent files", () => {
+      useDocumentStore.getState().addRecentFile("/path/a.tex");
+      useDocumentStore.getState().addRecentFile("/path/b.tex");
+      useDocumentStore.getState().removeRecentFile("/path/a.tex");
+      const recent = useDocumentStore.getState().recentFiles;
+      expect(recent).toHaveLength(1);
+      expect(recent[0].path).toBe("/path/b.tex");
+    });
+  });
+
+  describe("openFile", () => {
+    it("sets filename and content", () => {
+      useDocumentStore.getState().openFile("/path/doc.tex", "content here");
+      const { filename, content } = useDocumentStore.getState();
+      expect(filename).toBe("/path/doc.tex");
+      expect(content).toBe("content here");
+    });
+
+    it("clears dirty flag when opening a file", () => {
+      useDocumentStore.getState().setContent("dirty");
+      useDocumentStore.getState().openFile("/path/doc.tex", "clean");
+      expect(useDocumentStore.getState().isDirty).toBe(false);
+    });
+
+    it("adds opened file to recent files", () => {
+      useDocumentStore.getState().openFile("/path/doc.tex", "content");
+      const recent = useDocumentStore.getState().recentFiles;
+      expect(recent[0].path).toBe("/path/doc.tex");
     });
   });
 });
