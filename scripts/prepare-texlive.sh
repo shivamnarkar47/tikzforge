@@ -117,6 +117,11 @@ PROFILE
   fi
 
   cp -a "$tmpdir/texlive/bin/x86_64-linux/." "$dest/"
+
+  # Remove man pages — they bloat the bundle and may contain symlinks that
+  # break Tauri's resource validator.
+  rm -rf "$dest/man"
+
   mkdir -p "$STAGE_DIR/linux/texmf-dist"
   cp -a "$tmpdir/texlive/texmf-dist/." "$STAGE_DIR/linux/texmf-dist/" 2>/dev/null || true
 
@@ -170,6 +175,11 @@ PROFILE
   fi
 
   cp -a "$tmpdir/texlive/bin/win32/." "$dest/"
+
+  # Remove man pages — they bloat the bundle and may contain symlinks that
+  # break Tauri's resource validator.
+  rm -rf "$dest/man"
+
   mkdir -p "$STAGE_DIR/windows/texmf-dist"
   cp -a "$tmpdir/texlive/texmf-dist/." "$STAGE_DIR/windows/texmf-dist/" 2>/dev/null || true
 

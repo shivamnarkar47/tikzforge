@@ -34,12 +34,14 @@ if ! command -v jq &>/dev/null; then
 fi
 
 # Build the resources array from whatever platform dirs exist.
+# Narrow globs: only ship the binaries and texmf trees needed for
+# compilation. Exclude man pages, docs, and source files.
 RESOURCES="[]"
 if [[ -d "$TEXLIVE_DIR/linux" ]]; then
-  RESOURCES=$(echo "$RESOURCES" | jq '. + ["texlive/linux/**/*"]')
+  RESOURCES=$(echo "$RESOURCES" | jq '. + ["texlive/linux/bin/x86_64-linux/*", "texlive/linux/texmf-dist/*"]')
 fi
 if [[ -d "$TEXLIVE_DIR/windows" ]]; then
-  RESOURCES=$(echo "$RESOURCES" | jq '. + ["texlive/windows/**/*"]')
+  RESOURCES=$(echo "$RESOURCES" | jq '. + ["texlive/windows/bin/win32/*", "texlive/windows/texmf-dist/*"]')
 fi
 
 # Inject into the bundle object.
