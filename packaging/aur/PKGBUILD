@@ -9,7 +9,7 @@ license=('MIT')
 depends=('webkit2gtk-4.1' 'hicolor-icon-theme')
 makedepends=('bun' 'cargo' 'jq' 'patchelf' 'rust')
 source=("$pkgname-$pkgver.tar.gz::https://github.com/shivamnarkar47/tikzforge/archive/refs/tags/v$pkgver.tar.gz")
-sha256sums=('SKIP')
+sha256sums=('ac4ce9b620ca40e9e9320ba4f4106190e343e8e024318bdacea36eac95a7db0a')
 
 prepare() {
   cd "$srcdir/$pkgname-$pkgver"
