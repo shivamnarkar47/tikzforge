@@ -1,10 +1,9 @@
 #!/usr/bin/env bash
 # Prepare the bundled Tectonic engine for TikzForge.
 #
-# Downloads a self-contained Tectonic binary (~100MB) and stages it under
-# src-tauri/tectonic/ so Tauri's resource bundler ships it inside the
-# AppImage / NSIS installer. Tectonic handles its own dependency downloads
-# — no separate TeX Live, no Perl, no CTAN installer needed.
+# Builds Tectonic from crates.io via `cargo install` and stages the resulting
+# binary under src-tauri/tectonic/ so Tauri's resource bundler ships it inside
+# the AppImage / NSIS installer.
 #
 # Usage:
 #   ./scripts/prepare-texlive.sh           # prepare for current platform
@@ -23,7 +22,48 @@ STAGE_DIR="$REPO_ROOT/src-tauri/tectonic"
 
 log() { echo "[prepare-engine] $*"; }
 
+check_cargo() {
+  if ! command -v cargo &>/dev/null; then
+    log "cargo not found — installing Rust via rustup..."
+
+    local tmpdir
+    tmpdir="$(mktemp -d)"
+
+    case "$(uname -s)" in
+      Linux*)
+        curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs \
+          | sh -s -- -y --no-modify-path
+        ;;
+      MINGW*|MSYS*|CYGWIN*)
+        curl --proto '=https' --tlsv1.2 -sSf \
+          -o "$tmpdir/rustup-init.exe" \
+          https://static.rust-lang.org/rustup/dist/x86_64-pc-windows-msvc/rustup-init.exe
+        "$tmpdir/rustup-init.exe" -y --no-modify-path
+        rm -rf "$tmpdir"
+        ;;
+      *)
+        echo "[prepare-engine] Error: unsupported platform $(uname -s) for automatic Rust install."
+        echo "  Install Rust manually from https://rustup.rs"
+        exit 1
+        ;;
+    esac
+
+    # Make cargo available in the current shell session.
+    # shellcheck source=/dev/null
+    source "${HOME}/.cargo/env"
+
+    if ! command -v cargo &>/dev/null; then
+      echo "[prepare-engine] Error: rustup ran but cargo is still not on PATH."
+      echo "  Try opening a new shell or running: source ~/.cargo/env"
+      exit 1
+    fi
+    log "Rust installed successfully."
+  fi
+  log "cargo found at $(command -v cargo) ($(cargo --version))"
+}
+
 prepare_linux() {
+  check_cargo
   local dest="$STAGE_DIR"
   mkdir -p "$dest"
 
@@ -32,23 +72,22 @@ prepare_linux() {
     return 0
   fi
 
-  log "Installing Tectonic for Linux x86_64..."
+  log "Building Tectonic v${TECTONIC_VERSION} via cargo install (this takes a few minutes)..."
 
   local tmpdir
   tmpdir="$(mktemp -d)"
   trap 'rm -rf "$tmpdir"' RETURN
 
-  # Tectonic's drop-sh installer extracts the binary into the current
-  # directory. Run it from the temp dir, then copy the binary out.
-  ( cd "$tmpdir" && curl --proto '=https' --tlsv1.2 -fsSL https://drop-sh.fullyjustified.net | sh )
+  cargo install "tectonic@${TECTONIC_VERSION}" --root "$tmpdir"
 
-  cp "$tmpdir/tectonic" "$dest/tectonic"
+  cp "$tmpdir/bin/tectonic" "$dest/tectonic"
   chmod +x "$dest/tectonic"
 
-  log "Linux engine (Tectonic) staged at $dest/tectonic"
+  log "Linux engine staged at $dest/tectonic ($(du -h "$dest/tectonic" | cut -f1))"
 }
 
 prepare_windows() {
+  check_cargo
   local dest="$STAGE_DIR"
   mkdir -p "$dest"
 
@@ -57,21 +96,17 @@ prepare_windows() {
     return 0
   fi
 
-  log "Downloading Tectonic v${TECTONIC_VERSION} for Windows x86_64..."
+  log "Building Tectonic v${TECTONIC_VERSION} via cargo install (this takes a few minutes)..."
 
   local tmpdir
   tmpdir="$(mktemp -d)"
   trap 'rm -rf "$tmpdir"' RETURN
 
-  curl -fsSL --retry 3 --retry-delay 5 \
-    "https://github.com/tectonic-typesetting/tectonic/releases/download/tectonic%40${TECTONIC_VERSION}/tectonic-${TECTONIC_VERSION}-x86_64-pc-windows-msvc.zip" \
-    -o "$tmpdir/tectonic.zip"
+  cargo install "tectonic@${TECTONIC_VERSION}" --root "$tmpdir"
 
-  unzip -q "$tmpdir/tectonic.zip" -d "$tmpdir"
+  cp "$tmpdir/bin/tectonic.exe" "$dest/tectonic.exe"
 
-  find "$tmpdir" -name 'tectonic.exe' -exec cp {} "$dest/" \;
-
-  log "Windows engine (Tectonic) staged at $dest/tectonic.exe"
+  log "Windows engine staged at $dest/tectonic.exe ($(du -h "$dest/tectonic.exe" | cut -f1))"
 }
 
 case "${1:-current}" in
@@ -80,7 +115,7 @@ case "${1:-current}" in
   all)      prepare_linux; prepare_windows ;;
   current)
     case "$(uname -s)" in
-      Linux*)  prepare_linux ;;
+      Linux*)              prepare_linux ;;
       MINGW*|MSYS*|CYGWIN*) prepare_windows ;;
       *) echo "Unknown platform $(uname -s)"; exit 1 ;;
     esac

@@ -41,6 +41,20 @@ pub fn current_platform() -> Platform {
     }
 }
 
+/// Search each directory in `PATH` for `name` and return the first match.
+fn find_on_path(name: &str) -> Option<PathBuf> {
+    std::env::var_os("PATH").and_then(|path_var| {
+        std::env::split_paths(&path_var).find_map(|dir| {
+            let candidate = dir.join(name);
+            if candidate.is_file() {
+                Some(candidate)
+            } else {
+                None
+            }
+        })
+    })
+}
+
 /// Resolve which engine to use: bundled if present, else fall back to PATH.
 pub fn resolve_engine(handle: &tauri::AppHandle) -> Engine {
     use tauri::Manager;
@@ -53,14 +67,14 @@ pub fn resolve_engine(handle: &tauri::AppHandle) -> Engine {
             }
         }
     }
-    // Fallback for dev / non-bundled builds.
+    // Fallback for dev / non-bundled builds: resolve absolute path via PATH
+    // so that detect_engine's is_file() check works correctly.
     let exe_name = match platform {
         Platform::Windows => "tectonic.exe",
         _ => "tectonic",
     };
-    Engine {
-        path: exe_name.into(),
-    }
+    let path = find_on_path(exe_name).unwrap_or_else(|| PathBuf::from(exe_name));
+    Engine { path }
 }
 
 #[cfg(test)]

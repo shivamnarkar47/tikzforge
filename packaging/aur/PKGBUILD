@@ -1,0 +1,52 @@
+# Maintainer: TikzForge contributors
+pkgname=tikzforge
+pkgver=0.1.1
+pkgrel=1
+pkgdesc='Native TikZ/LaTeX editor with live PDF preview'
+arch=('x86_64')
+url='https://github.com/shivamnarkar47/tikzforge'
+license=('MIT')
+depends=('webkit2gtk-4.1' 'hicolor-icon-theme')
+makedepends=('bun' 'cargo' 'jq' 'patchelf' 'rust')
+source=("$pkgname-$pkgver.tar.gz::https://github.com/shivamnarkar47/tikzforge/archive/refs/tags/v$pkgver.tar.gz")
+sha256sums=('SKIP')
+
+prepare() {
+  cd "$srcdir/$pkgname-$pkgver"
+
+  # Build the self-contained TeX engine from crates.io instead of asking
+  # users to install TeX Live separately. The resource is copied into the
+  # Tauri package below src-tauri/tectonic/.
+  local engine_root="$srcdir/tectonic-root"
+  CARGO_HOME="$srcdir/cargo-home" \
+    cargo install --locked --version 0.17.0 tectonic --root "$engine_root"
+  install -Dm755 "$engine_root/bin/tectonic" src-tauri/tectonic/tectonic
+
+  # The upstream base config leaves resources out for local development.
+  # Inject the staged engine so Tauri places it beside the installed app.
+  bash scripts/generate-tauri-config.sh --force
+}
+
+build() {
+  cd "$srcdir/$pkgname-$pkgver"
+
+  bun install --frozen-lockfile
+  bun run tauri build --bundles deb
+}
+
+package() {
+  cd "$srcdir/$pkgname-$pkgver"
+
+  local deb
+  deb=(src-tauri/target/release/bundle/deb/*.deb)
+  if (( ${#deb[@]} != 1 )); then
+    error "Expected one Tauri Debian package, found ${#deb[@]}"
+    return 1
+  fi
+
+  mkdir -p "$srcdir/deb"
+  bsdtar -xf "${deb[0]}" -C "$srcdir/deb"
+  bsdtar -xf "$srcdir/deb/data.tar.gz" -C "$pkgdir"
+}
+
+# vim: set ft=sh ts=2 sw=2 et:

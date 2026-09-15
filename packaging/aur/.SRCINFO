@@ -1,0 +1,18 @@
+pkgbase = tikzforge
+	pkgdesc = Native TikZ/LaTeX editor with live PDF preview
+	pkgver = 0.1.1
+	pkgrel = 1
+	url = https://github.com/shivamnarkar47/tikzforge
+	arch = x86_64
+	license = MIT
+	makedepends = bun
+	makedepends = cargo
+	makedepends = jq
+	makedepends = patchelf
+	makedepends = rust
+	depends = webkit2gtk-4.1
+	depends = hicolor-icon-theme
+	source = tikzforge-0.1.1.tar.gz::https://github.com/shivamnarkar47/tikzforge/archive/refs/tags/v0.1.1.tar.gz
+	sha256sums = SKIP
+
+pkgname = tikzforge

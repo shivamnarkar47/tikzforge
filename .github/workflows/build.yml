@@ -45,12 +45,12 @@ jobs:
 
       - name: Prepare bundled Tectonic (Linux)
         if: matrix.platform == 'ubuntu-latest'
-        timeout-minutes: 15
+        timeout-minutes: 40
         run: bash scripts/prepare-texlive.sh linux
 
       - name: Prepare bundled Tectonic (Windows)
         if: matrix.platform == 'windows-latest'
-        timeout-minutes: 15
+        timeout-minutes: 40
         run: bash scripts/prepare-texlive.sh windows
 
       - name: Generate Tauri config with Tectonic resource
