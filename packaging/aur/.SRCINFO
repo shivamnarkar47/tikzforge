@@ -13,6 +13,6 @@ pkgbase = tikzforge
 	depends = webkit2gtk-4.1
 	depends = hicolor-icon-theme
 	source = tikzforge-0.1.2.tar.gz::https://github.com/shivamnarkar47/tikzforge/archive/refs/tags/v0.1.2.tar.gz
-	sha256sums = SKIP
+	sha256sums = cb899f80563694ac0226b621948b846f33b16098b59567ec3c0dd92f2125ab01
 
 pkgname = tikzforge
