@@ -88,6 +88,17 @@ prepare_linux() {
 
 prepare_windows() {
   check_cargo
+
+  if [[ -z "${VCPKG_ROOT:-}" ]]; then
+    echo "[prepare-engine] Error: Windows Tectonic builds require VCPKG_ROOT."
+    echo "  Install Tectonic's native dependencies with vcpkg and set"
+    echo "  TECTONIC_DEP_BACKEND=vcpkg, VCPKG_ROOT, and VCPKGRS_TRIPLET."
+    exit 1
+  fi
+  export TECTONIC_DEP_BACKEND="${TECTONIC_DEP_BACKEND:-vcpkg}"
+  export VCPKGRS_TRIPLET="${VCPKGRS_TRIPLET:-x64-windows-static}"
+  export RUSTFLAGS="${RUSTFLAGS:--Ctarget-feature=+crt-static}"
+
   local dest="$STAGE_DIR"
   mkdir -p "$dest"
 

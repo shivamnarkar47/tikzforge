@@ -30,7 +30,33 @@ jobs:
         if: matrix.platform == 'ubuntu-latest'
         run: |
           sudo apt-get update
-          sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
+          sudo apt-get install -y \
+            libgtk-3-dev libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev \
+            libfontconfig1-dev libgraphite2-dev libharfbuzz-dev libicu-dev \
+            libpng-dev libssl-dev pkg-config zlib1g-dev patchelf
+
+      - name: Install Tectonic dependencies (Windows)
+        if: matrix.platform == 'windows-latest'
+        shell: pwsh
+        run: |
+          $vcpkgRoot = $env:VCPKG_INSTALLATION_ROOT
+          if ([string]::IsNullOrWhiteSpace($vcpkgRoot) -or
+              -not (Test-Path (Join-Path $vcpkgRoot 'vcpkg.exe'))) {
+            $vcpkgRoot = Join-Path $env:RUNNER_TEMP 'vcpkg'
+            if (Test-Path $vcpkgRoot) {
+              Remove-Item -Recurse -Force $vcpkgRoot
+            }
+            git clone --depth 1 https://github.com/microsoft/vcpkg.git $vcpkgRoot
+            & (Join-Path $vcpkgRoot 'bootstrap-vcpkg.bat')
+          }
+
+          $vcpkg = Join-Path $vcpkgRoot 'vcpkg.exe'
+          & $vcpkg install fontconfig freetype 'harfbuzz[graphite2]' icu libpng zlib --triplet x64-windows-static
+          "VCPKG_ROOT=$vcpkgRoot" >> $env:GITHUB_ENV
+          "VCPKG_DEFAULT_TRIPLET=x64-windows-static" >> $env:GITHUB_ENV
+          "VCPKGRS_TRIPLET=x64-windows-static" >> $env:GITHUB_ENV
+          "TECTONIC_DEP_BACKEND=vcpkg" >> $env:GITHUB_ENV
+          "RUSTFLAGS=-Ctarget-feature=+crt-static" >> $env:GITHUB_ENV
 
       - name: Install frontend dependencies
         run: bun install --frozen-lockfile
