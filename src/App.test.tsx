@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { render, screen, fireEvent } from "@testing-library/react";
 import App from "./App";
 import { useLatexEngineStore } from "./store/latex-engine-store";
 
@@ -48,5 +48,21 @@ describe("App", () => {
     render(<App />);
     expect(screen.getByText("LaTeX not found")).toBeInTheDocument();
     expect(document.querySelector(".cm-editor")).toBeNull();
+  });
+
+  it("toggles the compilation log panel from the header", () => {
+    render(<App />);
+    expect(
+      screen.queryByRole("region", { name: /compilation log/i })
+    ).not.toBeInTheDocument();
+    expect(screen.queryByText(/no compilation log yet/i)).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: /^logs$/i }));
+
+    expect(screen.getByText(/no compilation log yet/i)).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: /^logs$/i }));
+
+    expect(screen.queryByText(/no compilation log yet/i)).not.toBeInTheDocument();
   });
 });
