@@ -2,6 +2,7 @@ import { Editor } from "./components/editor";
 import { PdfViewer } from "./components/pdf-viewer";
 import { CompileButton } from "./components/compile-button";
 import { ErrorList } from "./components/error-list";
+import { LogPanel } from "./components/log-panel";
 import { FirstLaunchGate } from "./components/first-launch-gate";
 import { useDocumentStore } from "./store/document-store";
 import { DEFAULT_TEMPLATE } from "./lib/default-template";
@@ -12,7 +13,7 @@ import { Input } from "./components/ui/input";
 import { Toggle } from "./components/ui/toggle";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "./components/ui/tabs";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "./components/ui/tooltip";
-import { Moon, Sun, Save } from "lucide-react";
+import { Moon, Sun, Save, ScrollText } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useThemeStore } from "./store/theme-store";
 import { useSystemTheme } from "./hooks/use-system-theme";
@@ -27,6 +28,7 @@ function App() {
   const { compile, cancel } = useCompile();
   useFirstLaunch();
   const [ready, setReady] = useState(false);
+  const [showLog, setShowLog] = useState(false);
 
   // Restore persisted state on mount
   useEffect(() => {
@@ -106,6 +108,15 @@ function App() {
               onCompile={() => void compile(filename, content)}
               onCancel={() => cancel()}
             />
+            <Button
+              variant="outline"
+              size="sm"
+              aria-pressed={showLog}
+              onClick={() => setShowLog((v) => !v)}
+            >
+              <ScrollText />
+              Logs
+            </Button>
             <Toggle
               aria-label="Toggle theme"
               pressed={isDark}
@@ -117,6 +128,11 @@ function App() {
           <div className="border-b px-3 py-1">
             <ErrorList />
           </div>
+          {showLog && (
+            <div className="border-b">
+              <LogPanel />
+            </div>
+          )}
           <Tabs defaultValue="split" className="flex min-h-0 flex-1 flex-col">
             <TabsList className="mx-3 mt-2 w-fit">
               <TabsTrigger value="split">Split</TabsTrigger>
