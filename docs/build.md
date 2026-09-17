@@ -46,9 +46,9 @@ fails fast if the binary is missing — without it the installer builds fine
 but the app reports "LaTeX not found" on launch.
 
 The staged `src-tauri/tectonic/` directory is gitignored and cached in CI.
-For `tauri dev`, install Tectonic on PATH instead
-(`cargo install tectonic` or your system package); the app falls back to PATH
-when no bundled engine is present.
+`tauri dev` picks the staged binary up automatically (it probes the source
+tree, since dev mode never bundles resources); installing Tectonic on PATH
+is only a last-resort fallback.
 
 Note: Tectonic fetches its TeX package bundle from the network on first
 compile and caches it locally, so the very first compile needs connectivity
