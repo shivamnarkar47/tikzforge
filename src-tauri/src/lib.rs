@@ -6,7 +6,7 @@ use std::fs;
 use std::io::{BufRead, BufReader, Read};
 use std::path::PathBuf;
 use std::process::{Child, Command, ExitStatus, Stdio};
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 use tauri::Emitter;
@@ -20,9 +20,12 @@ const COMPILE_LOG_EVENT: &str = "compile-log";
 /// download blocks the UI spinner forever.
 const COMPILE_TIMEOUT: Duration = Duration::from_secs(10 * 60);
 
-/// Set by `cancel_compile`; the running `compile_tex` poll loop observes it
-/// within milliseconds and kills its child process.
-static COMPILE_CANCEL: AtomicBool = AtomicBool::new(false);
+/// Monotonic compile generation. Every `compile_tex` start and every
+/// `cancel_compile` bumps it; a running compile whose generation no longer
+/// matches is superseded and kills its child. Last starter always wins, so —
+/// unlike the previous cancel flag — execution order across Tauri's command
+/// threadpool cannot make a compile kill itself.
+static COMPILE_GEN: AtomicU64 = AtomicU64::new(0);
 
 /// Outcome of running the engine process with a timeout.
 #[derive(Debug)]
@@ -33,18 +36,20 @@ enum RunOutcome {
 }
 
 /// Wait for `child` (whose pipes are drained elsewhere), killing it if
-/// `timeout` elapses or `cancel` is set. Always reaps the process.
+/// `timeout` elapses or a newer compile generation supersedes `my_gen`.
+/// Always reaps the process.
 fn run_with_timeout(
     child: &mut Child,
     timeout: Duration,
-    cancel: &AtomicBool,
+    current_gen: &AtomicU64,
+    my_gen: u64,
 ) -> std::io::Result<RunOutcome> {
     let start = Instant::now();
     loop {
         if let Some(status) = child.try_wait()? {
             return Ok(RunOutcome::Finished(status));
         }
-        if cancel.load(Ordering::SeqCst) {
+        if current_gen.load(Ordering::SeqCst) != my_gen {
             let _ = child.kill();
             child.wait()?;
             return Ok(RunOutcome::Cancelled);
@@ -130,7 +135,7 @@ fn resolve_engine(handle: &tauri::AppHandle) -> texlive_resolver::Engine {
 #[tauri::command]
 fn compile_tex(handle: tauri::AppHandle, path: String, content: String) -> Result<CompileResult, String> {
     // A new compile supersedes any previous one still running.
-    COMPILE_CANCEL.store(false, Ordering::SeqCst);
+    let my_gen = COMPILE_GEN.fetch_add(1, Ordering::SeqCst) + 1;
     let tex_path = resolve_tex_path(&path)?;
     fs::write(&tex_path, content).map_err(|e| e.to_string())?;
 
@@ -169,7 +174,7 @@ fn compile_tex(handle: tauri::AppHandle, path: String, content: String) -> Resul
         Arc::clone(&transcript),
     );
 
-    let outcome = run_with_timeout(&mut child, COMPILE_TIMEOUT, &COMPILE_CANCEL)
+    let outcome = run_with_timeout(&mut child, COMPILE_TIMEOUT, &COMPILE_GEN, my_gen)
         .map_err(|e| format!("Failed while running Tectonic: {e}"))?;
     for reader in [out_reader, err_reader].into_iter().flatten() {
         let _ = reader.join();
@@ -206,13 +211,13 @@ fn compile_tex(handle: tauri::AppHandle, path: String, content: String) -> Resul
     }
 }
 
-/// Request cancellation of the running compile, if any. The `compile_tex`
-/// poll loop observes the flag within milliseconds, kills Tectonic, and
-/// returns a "cancelled" result. Fire-and-forget safe: setting the flag with
-/// no compile running is a no-op (the next `compile_tex` clears it on start).
+/// Request cancellation of the running compile, if any: bumps the compile
+/// generation so the running `compile_tex` observes the mismatch within
+/// milliseconds, kills Tectonic, and returns a "cancelled" result.
+/// Fire-and-forget safe: bumping with no compile running is a no-op.
 #[tauri::command]
 fn cancel_compile() {
-    COMPILE_CANCEL.store(true, Ordering::SeqCst);
+    COMPILE_GEN.fetch_add(1, Ordering::SeqCst);
 }
 
 /// Report the bundled engine path if it exists, else fall back to PATH.
