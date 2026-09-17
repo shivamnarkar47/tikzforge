@@ -77,6 +77,26 @@ describe("useFirstLaunch", () => {
     expect(state.error).toContain("Tauri unavailable");
   });
 
+  it("still resolves when a post-mount re-render cancels the first effect", async () => {
+    vi.mocked(detectInstallation).mockResolvedValue({
+      detected: true,
+      path: "/app/resources/tectonic/tectonic",
+    });
+
+    const { rerender } = renderHook(() => useFirstLaunch());
+    // Simulates App's setReady(true) re-render: the effect cleans up and
+    // re-runs while detection is still in flight.
+    rerender();
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0);
+    });
+
+    const state = useLatexEngineStore.getState();
+    expect(state.status).toBe("ready");
+    expect(state.pdflatexPath).toBe("/app/resources/tectonic/tectonic");
+  });
+
   it("does not re-run detection if status is already ready", () => {
     useLatexEngineStore.setState({ status: "ready", pdflatexPath: "/usr/bin/pdflatex" });
     vi.mocked(detectInstallation).mockResolvedValue({ detected: true, path: "/x" });
