@@ -19,6 +19,23 @@ A native desktop app for editing TikZ/LaTeX diagrams with live PDF preview.
 - **LaTeX Engine Management** — Detect existing installation or download minimal TeX Live
 - **Auto-Updates** — Tauri updater checks for new versions on startup
 
+## Roadmap
+
+Near-term (hooks exist, wiring in progress — see #10):
+
+- **Auto-Compile rollout** — connect the editor to the auto-compile hook: 2s debounce, queue-while-busy, toolbar toggle (on by default)
+- **SyncTeX end-to-end** — pass `--synctex` to the engine so `Ctrl+Click` jump-to-source works on real output
+- **Offline first compile** — ship a pre-warmed engine bundle; today the first build downloads engine data once, then caches
+- **Finish file workflows** — wire Auto-Save + unclean-shutdown restore offer, `Ctrl+O` / `Ctrl+S` shortcuts, and the tab-close guard into the UI
+- **Real auto-updater** — backend currently reports "no update"; connect Tauri updater + `.tex` file association
+- **Template library** — starter TikZ examples beyond the default template
+- **Close #10** — bundled-engine acceptance across AppImage + NSIS installers
+
+Later:
+
+- **Multi-file documents** — `\include` / `\input` project support
+- **macOS support** — out of scope for v0.1 (Linux + Windows first)
+
 ## Tech Stack
 
 - **Frontend**: React 19 + TypeScript + Vite
