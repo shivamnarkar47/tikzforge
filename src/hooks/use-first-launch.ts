@@ -1,29 +1,41 @@
 import { useEffect } from "react";
-import { detectInstallation } from "../lib/latex-engine";
+import { detectInstallation, type DetectionResult } from "../lib/latex-engine";
 import { useLatexEngineStore } from "../store/latex-engine-store";
 
 /**
  * First-launch LaTeX engine detection.
  *
- * On mount, if the engine store is still in its initial "unknown" state,
+ * On mount, if the engine store has no resolved status ("ready"/"error"),
  * this hook calls `detectInstallation` and transitions the store:
  *   - detected=true  → status "ready" with the resolved path
  *   - detected=false → status "error" with a bundled-engine hint
  *   - throw          → status "error" with the error message
  *
- * If the store is already "ready" (e.g. persisted from a prior session),
- * detection is skipped.
+ * The in-flight promise is shared module-wide: post-mount re-renders (App's
+ * `setReady`, StrictMode remounts) tear down and re-run this effect while
+ * detection is still pending. Re-attaching to the same promise instead of
+ * starting over keeps exactly one `invoke` in flight and guarantees the
+ * latest mount applies the result — otherwise cleanup cancels the only
+ * request and the gate sticks on "detected" forever.
  */
-export function useFirstLaunch(): void {
-  const { status, setStatus, setPdflatexPath, setError } = useLatexEngineStore.getState();
+let inFlight: Promise<DetectionResult> | null = null;
 
+export function useFirstLaunch(): void {
   useEffect(() => {
-    if (status !== "unknown") return;
+    const { status, setStatus, setPdflatexPath, setError } =
+      useLatexEngineStore.getState();
+    if (status === "ready" || status === "error") return;
 
     let cancelled = false;
     setStatus("detected");
 
-    detectInstallation()
+    const pending =
+      inFlight ??
+      (inFlight = detectInstallation().finally(() => {
+        inFlight = null;
+      }));
+
+    pending
       .then((result) => {
         if (cancelled) return;
         if (result.detected && result.path) {
@@ -46,7 +58,7 @@ export function useFirstLaunch(): void {
     return () => {
       cancelled = true;
     };
-    // Intentionally run once on mount when status is "unknown".
+    // Re-runs when App re-renders; in-flight sharing keeps one request alive.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [status, setStatus, setPdflatexPath, setError]);
+  }, [useLatexEngineStore]);
 }
