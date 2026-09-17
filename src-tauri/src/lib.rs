@@ -3,9 +3,99 @@ mod texlive_resolver;
 use flate2::read::GzDecoder;
 use serde::Serialize;
 use std::fs;
-use std::io::Read;
+use std::io::{BufRead, BufReader, Read};
 use std::path::PathBuf;
-use std::process::Command;
+use std::process::{Child, Command, ExitStatus, Stdio};
+use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::{Arc, Mutex};
+use std::time::{Duration, Instant};
+use tauri::Emitter;
+
+/// Tauri event carrying one engine output line while a compile runs.
+const COMPILE_LOG_EVENT: &str = "compile-log";
+
+/// How long a single Tectonic run may take before it is killed.
+/// First-ever compiles download the engine bundle and fonts (minutes on slow
+/// links); normal documents finish in seconds. Without a ceiling a stalled
+/// download blocks the UI spinner forever.
+const COMPILE_TIMEOUT: Duration = Duration::from_secs(10 * 60);
+
+/// Monotonic compile generation. Every `compile_tex` start and every
+/// `cancel_compile` bumps it; a running compile whose generation no longer
+/// matches is superseded and kills its child. Last starter always wins, so —
+/// unlike the previous cancel flag — execution order across Tauri's command
+/// threadpool cannot make a compile kill itself.
+static COMPILE_GEN: AtomicU64 = AtomicU64::new(0);
+
+/// Outcome of running the engine process with a timeout.
+#[derive(Debug)]
+enum RunOutcome {
+    Finished(ExitStatus),
+    TimedOut,
+    Cancelled,
+}
+
+/// Wait for `child` (whose pipes are drained elsewhere), killing it if
+/// `timeout` elapses or a newer compile generation supersedes `my_gen`.
+/// Always reaps the process.
+fn run_with_timeout(
+    child: &mut Child,
+    timeout: Duration,
+    current_gen: &AtomicU64,
+    my_gen: u64,
+) -> std::io::Result<RunOutcome> {
+    let start = Instant::now();
+    loop {
+        if let Some(status) = child.try_wait()? {
+            return Ok(RunOutcome::Finished(status));
+        }
+        if current_gen.load(Ordering::SeqCst) != my_gen {
+            let _ = child.kill();
+            child.wait()?;
+            return Ok(RunOutcome::Cancelled);
+        }
+        if start.elapsed() >= timeout {
+            let _ = child.kill();
+            child.wait()?;
+            return Ok(RunOutcome::TimedOut);
+        }
+        std::thread::sleep(Duration::from_millis(50));
+    }
+}
+
+/// Drain one engine pipe on a background thread: append every line to the
+/// shared transcript and forward it to the frontend as a `compile-log`
+/// event. Returns the thread handle so the caller can join it (pipes hit
+/// EOF once the child exits) before reading the finished transcript.
+fn spawn_log_streamer<R>(
+    stream: Option<R>,
+    handle: tauri::AppHandle,
+    transcript: Arc<Mutex<String>>,
+) -> Option<std::thread::JoinHandle<()>>
+where
+    R: Read + Send + 'static,
+{
+    stream.map(|s| {
+        std::thread::spawn(move || {
+            let mut reader = BufReader::new(s);
+            let mut line = String::new();
+            loop {
+                line.clear();
+                match reader.read_line(&mut line) {
+                    Ok(0) | Err(_) => break,
+                    Ok(_) => {
+                        let text = line.trim_end().to_owned();
+                        if let Ok(mut t) = transcript.lock() {
+                            t.push_str(&text);
+                            t.push('\n');
+                        }
+                        let _ = handle.emit(COMPILE_LOG_EVENT, text);
+                    }
+                }
+            }
+        })
+    })
+}
 
 #[derive(Serialize)]
 struct CompileResult {
@@ -44,6 +134,8 @@ fn resolve_engine(handle: &tauri::AppHandle) -> texlive_resolver::Engine {
 
 #[tauri::command]
 fn compile_tex(handle: tauri::AppHandle, path: String, content: String) -> Result<CompileResult, String> {
+    // A new compile supersedes any previous one still running.
+    let my_gen = COMPILE_GEN.fetch_add(1, Ordering::SeqCst) + 1;
     let tex_path = resolve_tex_path(&path)?;
     fs::write(&tex_path, content).map_err(|e| e.to_string())?;
 
@@ -59,21 +151,73 @@ fn compile_tex(handle: tauri::AppHandle, path: String, content: String) -> Resul
     let engine = resolve_engine(&handle);
     // Tectonic is self-contained: handles its own dependency downloads and
     // produces a single-pass PDF. No -synctex or -shell-escape flags needed.
-    let output = Command::new(&engine.path)
+    let mut child = Command::new(&engine.path)
         .arg(&file_name)
         .current_dir(&dir)
-        .output()
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
         .map_err(|e| format!("Failed to run Tectonic: {e}"))?;
 
-    let log = String::from_utf8_lossy(&output.stdout).into_owned();
+    // Stream both pipes live: each line goes to the shared transcript and to
+    // the frontend as a `compile-log` event. Join the threads (EOF follows
+    // child exit) before reading the finished transcript.
+    let transcript = Arc::new(Mutex::new(String::new()));
+    let out_reader = spawn_log_streamer(
+        child.stdout.take(),
+        handle.clone(),
+        Arc::clone(&transcript),
+    );
+    let err_reader = spawn_log_streamer(
+        child.stderr.take(),
+        handle.clone(),
+        Arc::clone(&transcript),
+    );
+
+    let outcome = run_with_timeout(&mut child, COMPILE_TIMEOUT, &COMPILE_GEN, my_gen)
+        .map_err(|e| format!("Failed while running Tectonic: {e}"))?;
+    for reader in [out_reader, err_reader].into_iter().flatten() {
+        let _ = reader.join();
+    }
+    let log = transcript.lock().map(|t| t.clone()).unwrap_or_default();
+
     let stem = tex_path
         .file_stem()
         .map(|s| s.to_string_lossy().into_owned())
         .unwrap_or_else(|| "untitled".to_string());
-    let pdf = fs::read(dir.join(format!("{stem}.pdf"))).ok();
-    let success = output.status.success() && pdf.is_some();
 
-    Ok(CompileResult { pdf, log, success })
+    match outcome {
+        RunOutcome::Finished(status) => {
+            let pdf = fs::read(dir.join(format!("{stem}.pdf"))).ok();
+            let success = status.success() && pdf.is_some();
+            Ok(CompileResult { pdf, log, success })
+        }
+        RunOutcome::TimedOut => Ok(CompileResult {
+            pdf: None,
+            log: format!(
+                "Tectonic did not finish within {} minutes and was stopped.\n\
+                 Note: the first compile downloads the engine bundle and fonts, \
+                 which can take several minutes on slow connections — retry once \
+                 it has cached them.\n\nPartial output:\n{log}",
+                COMPILE_TIMEOUT.as_secs() / 60,
+            ),
+            success: false,
+        }),
+        RunOutcome::Cancelled => Ok(CompileResult {
+            pdf: None,
+            log: format!("Compile cancelled by user.\n\nPartial output:\n{log}"),
+            success: false,
+        }),
+    }
+}
+
+/// Request cancellation of the running compile, if any: bumps the compile
+/// generation so the running `compile_tex` observes the mismatch within
+/// milliseconds, kills Tectonic, and returns a "cancelled" result.
+/// Fire-and-forget safe: bumping with no compile running is a no-op.
+#[tauri::command]
+fn cancel_compile() {
+    COMPILE_GEN.fetch_add(1, Ordering::SeqCst);
 }
 
 /// Report the bundled engine path if it exists, else fall back to PATH.
@@ -123,6 +267,7 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             greet,
             compile_tex,
+            cancel_compile,
             detect_engine,
             read_synctex,
             check_update

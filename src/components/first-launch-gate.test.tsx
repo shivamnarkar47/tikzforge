@@ -29,8 +29,8 @@ describe("FirstLaunchGate", () => {
   it("shows an error card when status is error", () => {
     useLatexEngineStore.setState({
       status: "error",
-      error: "No bundled TeX Live found.",
-      pdflatexPath: "/app/texlive/pdflatex",
+      error: "No bundled Tectonic engine found.",
+      pdflatexPath: "/app/tectonic/tectonic",
     });
 
     render(
@@ -40,7 +40,7 @@ describe("FirstLaunchGate", () => {
     );
 
     expect(screen.getByText("LaTeX not found")).toBeInTheDocument();
-    expect(screen.getByText("No bundled TeX Live found.")).toBeInTheDocument();
+    expect(screen.getByText("No bundled Tectonic engine found.")).toBeInTheDocument();
     expect(screen.getByText(/Expected at:/)).toBeInTheDocument();
     expect(screen.getByText("Retry")).toBeInTheDocument();
     expect(screen.queryByTestId("app-content")).not.toBeInTheDocument();
@@ -55,7 +55,7 @@ describe("FirstLaunchGate", () => {
       </FirstLaunchGate>
     );
 
-    expect(screen.getByText(/could not find its bundled TeX Live/i)).toBeInTheDocument();
+    expect(screen.getByText(/could not find its bundled Tectonic/i)).toBeInTheDocument();
   });
 
   it("shows an error card when stuck in detected state", () => {

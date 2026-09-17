@@ -25,26 +25,34 @@ Production builds produce:
 | `.rpm` | `src-tauri/target/release/bundle/rpm/*.rpm` |
 | AppImage | `src-tauri/target/release/bundle/appimage/*.AppImage` |
 
-## Bundled TeX Live
+## Bundled Tectonic engine
 
-The app ships a minimal TeX Live (`pdflatex` + TikZ/PGF + deps, ~300MB) so
-compilation works on first launch with no download.
+The app ships a self-contained Tectonic binary (~60MB, XeTeX-based, TikZ
+included) so compilation works on first launch with no separate LaTeX install.
 
-CI builds it via:
+Stage it before building:
 
 ```bash
-bash scripts/prepare-texlive.sh linux      # or `windows`
-bash scripts/generate-tauri-config.sh --force
+bash scripts/prepare-texlive.sh linux      # or `windows`, or `all`
+bash scripts/generate-tauri-config.sh      # verifies the staged binary
 bun run tauri build
 ```
 
-`prepare-texlive.sh` downloads a trimmed TeX Live profile and stages it under
-`src-tauri/texlive/<platform>/`. `generate-tauri-config.sh` injects the
-resource globs into `tauri.conf.json` so Tauri's bundler ships the tree inside
-the AppImage / NSIS installer.
+`prepare-texlive.sh` downloads the pinned prebuilt release asset
+(Tectonic v0.17.0) and stages it under `src-tauri/tectonic/`.
+`tauri.conf.json` declares `tectonic/*` as bundled resources, so Tauri ships
+the binary inside the AppImage / NSIS installer. `generate-tauri-config.sh`
+fails fast if the binary is missing — without it the installer builds fine
+but the app reports "LaTeX not found" on launch.
 
-The TeX Live tree is keyed by platform and cached in CI. Commit the
-`texlive/` directory if you want offline-local builds without re-downloading.
+The staged `src-tauri/tectonic/` directory is gitignored and cached in CI.
+`tauri dev` picks the staged binary up automatically (it probes the source
+tree, since dev mode never bundles resources); installing Tectonic on PATH
+is only a last-resort fallback.
+
+Note: Tectonic fetches its TeX package bundle from the network on first
+compile and caches it locally, so the very first compile needs connectivity
+even though engine detection works offline.
 
 ## AppImage builds on local Linux
 

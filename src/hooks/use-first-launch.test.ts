@@ -32,10 +32,10 @@ describe("useFirstLaunch", () => {
     expect(useLatexEngineStore.getState().status).toBe("detected");
   });
 
-  it("transitions to ready when pdflatex is detected", async () => {
+  it("transitions to ready when the bundled engine is detected", async () => {
     vi.mocked(detectInstallation).mockResolvedValue({
       detected: true,
-      path: "/app/resources/texlive/linux/bin/x86_64-linux/pdflatex",
+      path: "/app/resources/tectonic/tectonic",
     });
 
     renderHook(() => useFirstLaunch());
@@ -46,9 +46,7 @@ describe("useFirstLaunch", () => {
 
     const state = useLatexEngineStore.getState();
     expect(state.status).toBe("ready");
-    expect(state.pdflatexPath).toBe(
-      "/app/resources/texlive/linux/bin/x86_64-linux/pdflatex"
-    );
+    expect(state.pdflatexPath).toBe("/app/resources/tectonic/tectonic");
   });
 
   it("transitions to error when detection returns null", async () => {
@@ -62,7 +60,7 @@ describe("useFirstLaunch", () => {
 
     const state = useLatexEngineStore.getState();
     expect(state.status).toBe("error");
-    expect(state.error).toBeTruthy();
+    expect(state.error).toMatch(/tectonic/i);
   });
 
   it("transitions to error when detection throws", async () => {
@@ -77,6 +75,26 @@ describe("useFirstLaunch", () => {
     const state = useLatexEngineStore.getState();
     expect(state.status).toBe("error");
     expect(state.error).toContain("Tauri unavailable");
+  });
+
+  it("still resolves when a post-mount re-render cancels the first effect", async () => {
+    vi.mocked(detectInstallation).mockResolvedValue({
+      detected: true,
+      path: "/app/resources/tectonic/tectonic",
+    });
+
+    const { rerender } = renderHook(() => useFirstLaunch());
+    // Simulates App's setReady(true) re-render: the effect cleans up and
+    // re-runs while detection is still in flight.
+    rerender();
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0);
+    });
+
+    const state = useLatexEngineStore.getState();
+    expect(state.status).toBe("ready");
+    expect(state.pdflatexPath).toBe("/app/resources/tectonic/tectonic");
   });
 
   it("does not re-run detection if status is already ready", () => {

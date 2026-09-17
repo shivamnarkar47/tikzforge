@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
 // Mock @tauri-apps/api/core
 vi.mock("@tauri-apps/api/core", () => ({
@@ -11,18 +11,23 @@ import { detectInstallation } from "../lib/latex-engine";
 describe("detectInstallation", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    (window as unknown as Record<string, unknown>).__TAURI_INTERNALS__ = {};
   });
 
-  it("returns path when pdflatex is detected", async () => {
-    vi.mocked(invoke).mockResolvedValue("/usr/bin/pdflatex");
+  afterEach(() => {
+    delete (window as unknown as Record<string, unknown>).__TAURI_INTERNALS__;
+  });
+
+  it("returns path when the engine is detected", async () => {
+    vi.mocked(invoke).mockResolvedValue("/app/resources/tectonic/tectonic");
 
     const result = await detectInstallation();
 
-    expect(result).toEqual({ detected: true, path: "/usr/bin/pdflatex" });
+    expect(result).toEqual({ detected: true, path: "/app/resources/tectonic/tectonic" });
     expect(invoke).toHaveBeenCalledWith("detect_engine");
   });
 
-  it("returns detected=false when no pdflatex found", async () => {
+  it("returns detected=false when no engine found", async () => {
     vi.mocked(invoke).mockResolvedValue(null);
 
     const result = await detectInstallation();
@@ -36,5 +41,12 @@ describe("detectInstallation", () => {
     const result = await detectInstallation();
 
     expect(result).toEqual({ detected: false, path: null });
+  });
+
+  it("throws a browser-preview error outside the Tauri app", async () => {
+    delete (window as unknown as Record<string, unknown>).__TAURI_INTERNALS__;
+
+    await expect(detectInstallation()).rejects.toThrow(/browser preview/);
+    expect(invoke).not.toHaveBeenCalled();
   });
 });
