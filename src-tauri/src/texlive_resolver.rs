@@ -254,4 +254,47 @@ mod tests {
             .all(|p| p.ends_with("tectonic.exe")));
         assert!(!candidates.is_empty());
     }
+
+    #[cfg(unix)]
+    mod run_with_timeout_tests {
+        use crate::{run_with_timeout, RunOutcome};
+        use std::process::{Command, Stdio};
+        use std::time::{Duration, Instant};
+
+        fn spawn(args: &[&str]) -> std::process::Child {
+            Command::new(args[0])
+                .args(&args[1..])
+                .stdout(Stdio::piped())
+                .stderr(Stdio::piped())
+                .spawn()
+                .expect("test helper process failed to spawn")
+        }
+
+        #[test]
+        fn returns_output_before_timeout() {
+            let child = spawn(&["sh", "-c", "echo hello"]);
+            match run_with_timeout(child, Duration::from_secs(10)) {
+                Ok(RunOutcome::Finished(output)) => {
+                    assert!(output.status.success());
+                    assert!(String::from_utf8_lossy(&output.stdout).contains("hello"));
+                }
+                other => panic!("expected finished output, got {other:?}"),
+            }
+        }
+
+        #[test]
+        fn kills_process_on_timeout() {
+            let start = Instant::now();
+            let child = spawn(&["sleep", "60"]);
+            match run_with_timeout(child, Duration::from_secs(1)) {
+                Ok(RunOutcome::TimedOut(_)) => {
+                    assert!(
+                        start.elapsed() < Duration::from_secs(30),
+                        "timeout did not fire promptly"
+                    );
+                }
+                other => panic!("expected timeout, got {other:?}"),
+            }
+        }
+    }
 }

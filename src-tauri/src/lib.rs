@@ -5,7 +5,38 @@ use serde::Serialize;
 use std::fs;
 use std::io::Read;
 use std::path::PathBuf;
-use std::process::Command;
+use std::process::{Child, Command, Output, Stdio};
+use std::time::{Duration, Instant};
+
+/// How long a single Tectonic run may take before it is killed.
+/// First-ever compiles download the engine bundle and fonts (minutes on slow
+/// links); normal documents finish in seconds. Without a ceiling a stalled
+/// download blocks the UI spinner forever.
+const COMPILE_TIMEOUT: Duration = Duration::from_secs(10 * 60);
+
+/// Outcome of running the engine process with a timeout.
+#[derive(Debug)]
+enum RunOutcome {
+    Finished(Output),
+    /// The process was killed after the timeout; carries partial output.
+    TimedOut(Output),
+}
+
+/// Wait for `child`, killing it if `timeout` elapses. Always reaps the
+/// process and returns whatever output it produced.
+fn run_with_timeout(mut child: Child, timeout: Duration) -> std::io::Result<RunOutcome> {
+    let start = Instant::now();
+    loop {
+        match child.try_wait()? {
+            Some(_) => return child.wait_with_output().map(RunOutcome::Finished),
+            None if start.elapsed() >= timeout => {
+                let _ = child.kill();
+                return child.wait_with_output().map(RunOutcome::TimedOut);
+            }
+            None => std::thread::sleep(Duration::from_millis(50)),
+        }
+    }
+}
 
 #[derive(Serialize)]
 struct CompileResult {
@@ -59,11 +90,33 @@ fn compile_tex(handle: tauri::AppHandle, path: String, content: String) -> Resul
     let engine = resolve_engine(&handle);
     // Tectonic is self-contained: handles its own dependency downloads and
     // produces a single-pass PDF. No -synctex or -shell-escape flags needed.
-    let output = Command::new(&engine.path)
+    let child = Command::new(&engine.path)
         .arg(&file_name)
         .current_dir(&dir)
-        .output()
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
         .map_err(|e| format!("Failed to run Tectonic: {e}"))?;
+
+    let output = match run_with_timeout(child, COMPILE_TIMEOUT)
+        .map_err(|e| format!("Failed while running Tectonic: {e}"))?
+    {
+        RunOutcome::Finished(output) => output,
+        RunOutcome::TimedOut(partial) => {
+            let partial_log = String::from_utf8_lossy(&partial.stdout);
+            return Ok(CompileResult {
+                pdf: None,
+                log: format!(
+                    "Tectonic did not finish within {} minutes and was stopped.\n\
+                     Note: the first compile downloads the engine bundle and fonts, \
+                     which can take several minutes on slow connections — retry once \
+                     it has cached them.\n\nPartial output:\n{partial_log}",
+                    COMPILE_TIMEOUT.as_secs() / 60,
+                ),
+                success: false,
+            });
+        }
+    };
 
     let log = String::from_utf8_lossy(&output.stdout).into_owned();
     let stem = tex_path
