@@ -5,13 +5,14 @@ import { useDocumentStore } from "../store/document-store";
 
 vi.mock("../lib/compilation", () => ({
   compileDocument: vi.fn(),
+  cancelCompile: vi.fn(),
 }));
 
 vi.mock("../lib/compilation-parser", () => ({
   parseCompilationLog: vi.fn(),
 }));
 
-import { compileDocument } from "../lib/compilation";
+import { compileDocument, cancelCompile } from "../lib/compilation";
 import { parseCompilationLog } from "../lib/compilation-parser";
 
 describe("useCompile", () => {
@@ -127,5 +128,83 @@ describe("useCompile", () => {
     expect(state.pdfData).toBeNull();
     expect(state.compilationErrors).toHaveLength(1);
     expect(state.compilationErrors[0].message).toContain("browser preview");
+  });
+
+  it("ignores a stale compile that settles after a newer one", async () => {
+    let resolveStale!: (v: {
+      pdf: Uint8Array | null;
+      log: string;
+      success: boolean;
+    }) => void;
+    const stale = new Promise<{
+      pdf: Uint8Array | null;
+      log: string;
+      success: boolean;
+    }>((resolve) => {
+      resolveStale = resolve;
+    });
+    const freshPdf = new Uint8Array([9, 9, 9]);
+    vi.mocked(compileDocument)
+      .mockReturnValueOnce(stale)
+      .mockResolvedValueOnce({ pdf: freshPdf, log: "fresh", success: true });
+    vi.mocked(parseCompilationLog).mockReturnValue([]);
+
+    const { result } = renderHook(() => useCompile());
+
+    let first: Promise<void>;
+    act(() => {
+      first = result.current.compile("/path/doc.tex", "stale");
+    });
+    await act(async () => {
+      await result.current.compile("/path/doc.tex", "fresh");
+    });
+    await act(async () => {
+      resolveStale({ pdf: new Uint8Array([1]), log: "stale", success: true });
+      await first;
+    });
+
+    const state = useDocumentStore.getState();
+    expect(state.pdfData).toBe(freshPdf);
+    expect(state.isCompiling).toBe(false);
+  });
+
+  it("cancel() clears the spinner and ignores the late result", async () => {
+    let resolveLate!: (v: {
+      pdf: Uint8Array | null;
+      log: string;
+      success: boolean;
+    }) => void;
+    const late = new Promise<{
+      pdf: Uint8Array | null;
+      log: string;
+      success: boolean;
+    }>((resolve) => {
+      resolveLate = resolve;
+    });
+    vi.mocked(compileDocument).mockReturnValueOnce(late);
+    vi.mocked(parseCompilationLog).mockReturnValue([]);
+
+    const { result } = renderHook(() => useCompile());
+
+    let pending: Promise<void>;
+    act(() => {
+      pending = result.current.compile("/path/doc.tex", "content");
+    });
+    expect(useDocumentStore.getState().isCompiling).toBe(true);
+
+    vi.mocked(cancelCompile).mockClear();
+    act(() => {
+      result.current.cancel();
+    });
+    expect(useDocumentStore.getState().isCompiling).toBe(false);
+    expect(cancelCompile).toHaveBeenCalledTimes(1);
+
+    await act(async () => {
+      resolveLate({ pdf: new Uint8Array([1]), log: "late", success: true });
+      await pending;
+    });
+
+    expect(useDocumentStore.getState().pdfData).toBeNull();
+    expect(useDocumentStore.getState().isCompiling).toBe(false);
   });
 });

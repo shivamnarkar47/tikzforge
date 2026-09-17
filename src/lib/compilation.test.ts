@@ -11,7 +11,7 @@ vi.mock("../lib/tauri", () => ({
 }));
 
 import { invoke } from "@tauri-apps/api/core";
-import { compileDocument } from "../lib/compilation";
+import { compileDocument, cancelCompile } from "../lib/compilation";
 
 describe("compileDocument", () => {
   beforeEach(() => {
@@ -56,5 +56,25 @@ describe("compileDocument", () => {
     await expect(compileDocument("/path/doc.tex", "content")).rejects.toThrow(
       "Tauri error"
     );
+  });
+});
+
+describe("cancelCompile", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("invokes cancel_compile", async () => {
+    vi.mocked(invoke).mockResolvedValue(undefined);
+
+    await cancelCompile();
+
+    expect(invoke).toHaveBeenCalledWith("cancel_compile");
+  });
+
+  it("never throws when invoke fails", async () => {
+    vi.mocked(invoke).mockRejectedValue(new Error("gone"));
+
+    await expect(cancelCompile()).resolves.toBeUndefined();
   });
 });

@@ -29,3 +29,15 @@ export async function compileDocument(
     success: raw.success,
   };
 }
+
+/// Ask the backend to kill the running compile, if any. Safe to call with no
+/// compile in flight (the backend treats it as a no-op). Never throws: in a
+/// browser preview there is nothing to cancel.
+export async function cancelCompile(): Promise<void> {
+  if (!isTauri()) return;
+  try {
+    await invoke("cancel_compile");
+  } catch {
+    // Best-effort: cancel must never break the UI (backend gone, etc.).
+  }
+}
