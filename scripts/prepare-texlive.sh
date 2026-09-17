@@ -1,9 +1,15 @@
 #!/usr/bin/env bash
 # Prepare the bundled Tectonic engine for TikzForge.
 #
-# Builds Tectonic from crates.io via `cargo install` and stages the resulting
-# binary under src-tauri/tectonic/ so Tauri's resource bundler ships it inside
-# the AppImage / NSIS installer.
+# Downloads a self-contained, prebuilt Tectonic binary (~20MB) and stages it
+# under src-tauri/tectonic/ so Tauri's resource bundler ships it inside the
+# AppImage / NSIS installer. Tectonic handles its own TeX package downloads
+# at compile time — no separate TeX Live, no Perl, no CTAN installer needed.
+#
+# Prefer prebuilt release assets over `cargo install tectonic`: building from
+# source takes 10+ minutes, needs OpenSSL/fontconfig/harfbuzz dev headers
+# (plus vcpkg on Windows), and was the main source of CI flakes. A pinned
+# GitHub release download takes seconds and needs only curl + tar/unzip.
 #
 # Usage:
 #   ./scripts/prepare-texlive.sh           # prepare for current platform
@@ -17,53 +23,13 @@
 set -euo pipefail
 
 TECTONIC_VERSION="0.17.0"
+TECTONIC_BASE="https://github.com/tectonic-typesetting/tectonic/releases/download/tectonic%40${TECTONIC_VERSION}"
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 STAGE_DIR="$REPO_ROOT/src-tauri/tectonic"
 
 log() { echo "[prepare-engine] $*"; }
 
-check_cargo() {
-  if ! command -v cargo &>/dev/null; then
-    log "cargo not found — installing Rust via rustup..."
-
-    local tmpdir
-    tmpdir="$(mktemp -d)"
-
-    case "$(uname -s)" in
-      Linux*)
-        curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs \
-          | sh -s -- -y --no-modify-path
-        ;;
-      MINGW*|MSYS*|CYGWIN*)
-        curl --proto '=https' --tlsv1.2 -sSf \
-          -o "$tmpdir/rustup-init.exe" \
-          https://static.rust-lang.org/rustup/dist/x86_64-pc-windows-msvc/rustup-init.exe
-        "$tmpdir/rustup-init.exe" -y --no-modify-path
-        rm -rf "$tmpdir"
-        ;;
-      *)
-        echo "[prepare-engine] Error: unsupported platform $(uname -s) for automatic Rust install."
-        echo "  Install Rust manually from https://rustup.rs"
-        exit 1
-        ;;
-    esac
-
-    # Make cargo available in the current shell session.
-    # shellcheck source=/dev/null
-    source "${HOME}/.cargo/env"
-
-    if ! command -v cargo &>/dev/null; then
-      echo "[prepare-engine] Error: rustup ran but cargo is still not on PATH."
-      echo "  Try opening a new shell or running: source ~/.cargo/env"
-      exit 1
-    fi
-    log "Rust installed successfully."
-  fi
-  log "cargo found at $(command -v cargo) ($(cargo --version))"
-}
-
 prepare_linux() {
-  check_cargo
   local dest="$STAGE_DIR"
   mkdir -p "$dest"
 
@@ -72,33 +38,32 @@ prepare_linux() {
     return 0
   fi
 
-  log "Building Tectonic v${TECTONIC_VERSION} via cargo install (this takes a few minutes)..."
+  log "Downloading Tectonic v${TECTONIC_VERSION} for Linux x86_64..."
 
   local tmpdir
   tmpdir="$(mktemp -d)"
   trap 'rm -rf "$tmpdir"' RETURN
 
-  cargo install "tectonic@${TECTONIC_VERSION}" --root "$tmpdir"
+  curl -fsSL --retry 3 --retry-delay 5 \
+    "${TECTONIC_BASE}/tectonic-${TECTONIC_VERSION}-x86_64-unknown-linux-gnu.tar.gz" \
+    -o "$tmpdir/tectonic.tar.gz"
 
-  cp "$tmpdir/bin/tectonic" "$dest/tectonic"
+  tar -xzf "$tmpdir/tectonic.tar.gz" -C "$tmpdir"
+
+  local matches
+  matches="$(find "$tmpdir" -maxdepth 2 -name 'tectonic' -type f)"
+  if [[ "$(echo "$matches" | wc -l)" -ne 1 ]]; then
+    echo "[prepare-engine] Error: expected exactly one tectonic binary in the archive, found:"
+    echo "$matches"
+    exit 1
+  fi
+  cp "$matches" "$dest/tectonic"
   chmod +x "$dest/tectonic"
 
   log "Linux engine staged at $dest/tectonic ($(du -h "$dest/tectonic" | cut -f1))"
 }
 
 prepare_windows() {
-  check_cargo
-
-  if [[ -z "${VCPKG_ROOT:-}" ]]; then
-    echo "[prepare-engine] Error: Windows Tectonic builds require VCPKG_ROOT."
-    echo "  Install Tectonic's native dependencies with vcpkg and set"
-    echo "  TECTONIC_DEP_BACKEND=vcpkg, VCPKG_ROOT, and VCPKGRS_TRIPLET."
-    exit 1
-  fi
-  export TECTONIC_DEP_BACKEND="${TECTONIC_DEP_BACKEND:-vcpkg}"
-  export VCPKGRS_TRIPLET="${VCPKGRS_TRIPLET:-x64-windows-static}"
-  export RUSTFLAGS="${RUSTFLAGS:--Ctarget-feature=+crt-static}"
-
   local dest="$STAGE_DIR"
   mkdir -p "$dest"
 
@@ -107,15 +72,26 @@ prepare_windows() {
     return 0
   fi
 
-  log "Building Tectonic v${TECTONIC_VERSION} via cargo install (this takes a few minutes)..."
+  log "Downloading Tectonic v${TECTONIC_VERSION} for Windows x86_64..."
 
   local tmpdir
   tmpdir="$(mktemp -d)"
   trap 'rm -rf "$tmpdir"' RETURN
 
-  cargo install "tectonic@${TECTONIC_VERSION}" --root "$tmpdir"
+  curl -fsSL --retry 3 --retry-delay 5 \
+    "${TECTONIC_BASE}/tectonic-${TECTONIC_VERSION}-x86_64-pc-windows-msvc.zip" \
+    -o "$tmpdir/tectonic.zip"
 
-  cp "$tmpdir/bin/tectonic.exe" "$dest/tectonic.exe"
+  unzip -q "$tmpdir/tectonic.zip" -d "$tmpdir"
+
+  local matches
+  matches="$(find "$tmpdir" -maxdepth 2 -name 'tectonic.exe' -type f)"
+  if [[ "$(echo "$matches" | wc -l)" -ne 1 ]]; then
+    echo "[prepare-engine] Error: expected exactly one tectonic.exe in the archive, found:"
+    echo "$matches"
+    exit 1
+  fi
+  cp "$matches" "$dest/tectonic.exe"
 
   log "Windows engine staged at $dest/tectonic.exe ($(du -h "$dest/tectonic.exe" | cut -f1))"
 }

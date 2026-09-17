@@ -28,7 +28,7 @@ export function FirstLaunchGate({ children }: FirstLaunchGateProps) {
         <h2 className="text-lg font-semibold">LaTeX not found</h2>
         <p className="text-sm text-muted-foreground">
           {error ??
-            "TikzForge could not find its bundled TeX Live engine. Please reinstall the app."}
+            "TikzForge could not find its bundled Tectonic engine. Please reinstall the app."}
         </p>
         {pdflatexPath && (
           <p className="font-mono text-xs text-muted-foreground">
