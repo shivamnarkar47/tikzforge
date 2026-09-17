@@ -6,6 +6,7 @@ use std::fs;
 use std::io::Read;
 use std::path::PathBuf;
 use std::process::{Child, Command, Output, Stdio};
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::{Duration, Instant};
 
 /// How long a single Tectonic run may take before it is killed.
@@ -14,21 +15,35 @@ use std::time::{Duration, Instant};
 /// download blocks the UI spinner forever.
 const COMPILE_TIMEOUT: Duration = Duration::from_secs(10 * 60);
 
+/// Set by `cancel_compile`; the running `compile_tex` poll loop observes it
+/// within milliseconds and kills its child process.
+static COMPILE_CANCEL: AtomicBool = AtomicBool::new(false);
+
 /// Outcome of running the engine process with a timeout.
 #[derive(Debug)]
 enum RunOutcome {
     Finished(Output),
     /// The process was killed after the timeout; carries partial output.
     TimedOut(Output),
+    /// The process was killed via `cancel_compile`; carries partial output.
+    Cancelled(Output),
 }
 
-/// Wait for `child`, killing it if `timeout` elapses. Always reaps the
-/// process and returns whatever output it produced.
-fn run_with_timeout(mut child: Child, timeout: Duration) -> std::io::Result<RunOutcome> {
+/// Wait for `child`, killing it if `timeout` elapses or `cancel` is set.
+/// Always reaps the process and returns whatever output it produced.
+fn run_with_timeout(
+    mut child: Child,
+    timeout: Duration,
+    cancel: &AtomicBool,
+) -> std::io::Result<RunOutcome> {
     let start = Instant::now();
     loop {
         match child.try_wait()? {
             Some(_) => return child.wait_with_output().map(RunOutcome::Finished),
+            None if cancel.load(Ordering::SeqCst) => {
+                let _ = child.kill();
+                return child.wait_with_output().map(RunOutcome::Cancelled);
+            }
             None if start.elapsed() >= timeout => {
                 let _ = child.kill();
                 return child.wait_with_output().map(RunOutcome::TimedOut);
@@ -75,6 +90,8 @@ fn resolve_engine(handle: &tauri::AppHandle) -> texlive_resolver::Engine {
 
 #[tauri::command]
 fn compile_tex(handle: tauri::AppHandle, path: String, content: String) -> Result<CompileResult, String> {
+    // A new compile supersedes any previous one still running.
+    COMPILE_CANCEL.store(false, Ordering::SeqCst);
     let tex_path = resolve_tex_path(&path)?;
     fs::write(&tex_path, content).map_err(|e| e.to_string())?;
 
@@ -98,7 +115,7 @@ fn compile_tex(handle: tauri::AppHandle, path: String, content: String) -> Resul
         .spawn()
         .map_err(|e| format!("Failed to run Tectonic: {e}"))?;
 
-    let output = match run_with_timeout(child, COMPILE_TIMEOUT)
+    let output = match run_with_timeout(child, COMPILE_TIMEOUT, &COMPILE_CANCEL)
         .map_err(|e| format!("Failed while running Tectonic: {e}"))?
     {
         RunOutcome::Finished(output) => output,
@@ -116,6 +133,14 @@ fn compile_tex(handle: tauri::AppHandle, path: String, content: String) -> Resul
                 success: false,
             });
         }
+        RunOutcome::Cancelled(partial) => {
+            let partial_log = String::from_utf8_lossy(&partial.stdout);
+            return Ok(CompileResult {
+                pdf: None,
+                log: format!("Compile cancelled by user.\n\nPartial output:\n{partial_log}"),
+                success: false,
+            });
+        }
     };
 
     let log = String::from_utf8_lossy(&output.stdout).into_owned();
@@ -127,6 +152,15 @@ fn compile_tex(handle: tauri::AppHandle, path: String, content: String) -> Resul
     let success = output.status.success() && pdf.is_some();
 
     Ok(CompileResult { pdf, log, success })
+}
+
+/// Request cancellation of the running compile, if any. The `compile_tex`
+/// poll loop observes the flag within milliseconds, kills Tectonic, and
+/// returns a "cancelled" result. Fire-and-forget safe: setting the flag with
+/// no compile running is a no-op (the next `compile_tex` clears it on start).
+#[tauri::command]
+fn cancel_compile() {
+    COMPILE_CANCEL.store(true, Ordering::SeqCst);
 }
 
 /// Report the bundled engine path if it exists, else fall back to PATH.
@@ -176,6 +210,7 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             greet,
             compile_tex,
+            cancel_compile,
             detect_engine,
             read_synctex,
             check_update

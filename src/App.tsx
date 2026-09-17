@@ -24,7 +24,7 @@ function App() {
   const { content, setContent, pdfData, filename, setFilename, isDirty, markSaved } = useDocumentStore();
   const { theme, setTheme, setSystemTheme, resolvedTheme } = useThemeStore();
   const systemTheme = useSystemTheme();
-  const { compile } = useCompile();
+  const { compile, cancel } = useCompile();
   useFirstLaunch();
   const [ready, setReady] = useState(false);
 
@@ -102,7 +102,10 @@ function App() {
               </TooltipTrigger>
               <TooltipContent>Mark document as saved</TooltipContent>
             </Tooltip>
-            <CompileButton onCompile={() => void compile(filename, content)} />
+            <CompileButton
+              onCompile={() => void compile(filename, content)}
+              onCancel={() => cancel()}
+            />
             <Toggle
               aria-label="Toggle theme"
               pressed={isDark}

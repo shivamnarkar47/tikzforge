@@ -259,6 +259,7 @@ mod tests {
     mod run_with_timeout_tests {
         use crate::{run_with_timeout, RunOutcome};
         use std::process::{Command, Stdio};
+        use std::sync::atomic::{AtomicBool, Ordering};
         use std::time::{Duration, Instant};
 
         fn spawn(args: &[&str]) -> std::process::Child {
@@ -270,10 +271,14 @@ mod tests {
                 .expect("test helper process failed to spawn")
         }
 
+        fn no_cancel() -> AtomicBool {
+            AtomicBool::new(false)
+        }
+
         #[test]
         fn returns_output_before_timeout() {
             let child = spawn(&["sh", "-c", "echo hello"]);
-            match run_with_timeout(child, Duration::from_secs(10)) {
+            match run_with_timeout(child, Duration::from_secs(10), &no_cancel()) {
                 Ok(RunOutcome::Finished(output)) => {
                     assert!(output.status.success());
                     assert!(String::from_utf8_lossy(&output.stdout).contains("hello"));
@@ -286,7 +291,7 @@ mod tests {
         fn kills_process_on_timeout() {
             let start = Instant::now();
             let child = spawn(&["sleep", "60"]);
-            match run_with_timeout(child, Duration::from_secs(1)) {
+            match run_with_timeout(child, Duration::from_secs(1), &no_cancel()) {
                 Ok(RunOutcome::TimedOut(_)) => {
                     assert!(
                         start.elapsed() < Duration::from_secs(30),
@@ -295,6 +300,38 @@ mod tests {
                 }
                 other => panic!("expected timeout, got {other:?}"),
             }
+        }
+
+        #[test]
+        fn kills_process_when_cancel_flag_is_set() {
+            let cancel = AtomicBool::new(true);
+            let child = spawn(&["sleep", "60"]);
+            match run_with_timeout(child, Duration::from_secs(60), &cancel) {
+                Ok(RunOutcome::Cancelled(_)) => {}
+                other => panic!("expected cancelled outcome, got {other:?}"),
+            }
+        }
+
+        #[test]
+        fn cancel_mid_flight_stops_a_running_process() {
+            let cancel = AtomicBool::new(false);
+            let child = spawn(&["sleep", "60"]);
+            let start = Instant::now();
+            std::thread::scope(|s| {
+                s.spawn(|| {
+                    std::thread::sleep(Duration::from_millis(200));
+                    cancel.store(true, Ordering::SeqCst);
+                });
+                match run_with_timeout(child, Duration::from_secs(60), &cancel) {
+                    Ok(RunOutcome::Cancelled(_)) => {
+                        assert!(
+                            start.elapsed() < Duration::from_secs(30),
+                            "cancel did not stop the process promptly"
+                        );
+                    }
+                    other => panic!("expected cancelled outcome, got {other:?}"),
+                }
+            });
         }
     }
 }
