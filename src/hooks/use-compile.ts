@@ -13,8 +13,6 @@ let latestCompileId = 0;
 export function useCompile() {
   const compile = useCallback(async (path: string, content: string) => {
     const id = ++latestCompileId;
-    // Kill a previous backend run still in flight, if any.
-    void cancelCompile();
 
     const { setCompiling, setPdfData, setCompilationLog, setCompilationErrors } =
       useDocumentStore.getState();
