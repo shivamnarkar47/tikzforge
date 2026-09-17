@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
 import App from "./App";
 import { useLatexEngineStore } from "./store/latex-engine-store";
+import { useThemeStore } from "./store/theme-store";
 
 // The first-launch hook calls detectInstallation on mount.
 vi.mock("./lib/latex-engine", () => ({
@@ -22,6 +23,8 @@ describe("App", () => {
       detected: true,
       path: "/app/texlive/pdflatex",
     });
+    useThemeStore.setState({ theme: "light", systemTheme: "light" });
+    document.documentElement.classList.remove("dark");
   });
 
   it("renders the app shell with editor and PDF viewer", () => {
@@ -64,5 +67,16 @@ describe("App", () => {
     fireEvent.click(screen.getByRole("button", { name: /^logs$/i }));
 
     expect(screen.queryByText(/no compilation log yet/i)).not.toBeInTheDocument();
+  });
+
+  it("toggles the dark class on the document element", () => {
+    render(<App />);
+    expect(document.documentElement.classList.contains("dark")).toBe(false);
+
+    fireEvent.click(screen.getByRole("button", { name: /toggle theme/i }));
+    expect(document.documentElement.classList.contains("dark")).toBe(true);
+
+    fireEvent.click(screen.getByRole("button", { name: /toggle theme/i }));
+    expect(document.documentElement.classList.contains("dark")).toBe(false);
   });
 });
