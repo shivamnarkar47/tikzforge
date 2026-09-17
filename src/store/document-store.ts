@@ -27,6 +27,7 @@ export interface DocumentState {
   setCompiling: (isCompiling: boolean) => void;
   setCompilationErrors: (errors: CompilationError[]) => void;
   setCompilationLog: (log: string) => void;
+  appendCompilationLog: (line: string) => void;
   addRecentFile: (path: string) => void;
   removeRecentFile: (path: string) => void;
   openFile: (path: string, content: string) => void;
@@ -50,6 +51,10 @@ export const useDocumentStore = create<DocumentState>((set, get) => ({
   setCompiling: (isCompiling) => set({ isCompiling }),
   setCompilationErrors: (compilationErrors) => set({ compilationErrors }),
   setCompilationLog: (compilationLog) => set({ compilationLog }),
+  appendCompilationLog: (line) =>
+    set((state) => ({
+      compilationLog: state.compilationLog + line + "\n",
+    })),
   addRecentFile: (path) => {
     const { recentFiles } = get();
     const filtered = recentFiles.filter((f) => f.path !== path);

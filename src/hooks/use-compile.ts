@@ -20,9 +20,14 @@ export function useCompile() {
       useDocumentStore.getState();
 
     setCompiling(true);
+    // Fresh transcript per run; streamed lines append below as they arrive.
+    setCompilationLog("");
 
     try {
-      const result = await compileDocument(path, content);
+      const result = await compileDocument(path, content, (line) => {
+        if (id !== latestCompileId) return;
+        useDocumentStore.getState().appendCompilationLog(line);
+      });
       if (id !== latestCompileId) return;
 
       setCompilationLog(result.log);

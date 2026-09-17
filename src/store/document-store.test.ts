@@ -74,6 +74,16 @@ describe("DocumentStore", () => {
     });
   });
 
+  describe("appendCompilationLog", () => {
+    it("appends streamed lines to the log", () => {
+      useDocumentStore.getState().setCompilationLog("line one\n");
+      useDocumentStore.getState().appendCompilationLog("line two");
+      expect(useDocumentStore.getState().compilationLog).toBe(
+        "line one\nline two\n"
+      );
+    });
+  });
+
   describe("recentFiles", () => {
     it("has empty recent files by default", () => {
       expect(useDocumentStore.getState().recentFiles).toEqual([]);

@@ -1,4 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
+import { listen } from "@tauri-apps/api/event";
 import { isTauri } from "./tauri";
 
 export interface CompileResult {
@@ -15,19 +16,32 @@ interface RawCompileResult {
 
 export async function compileDocument(
   path: string,
-  content: string
+  content: string,
+  onLogLine?: (line: string) => void
 ): Promise<CompileResult> {
   if (!isTauri()) {
     throw new Error(
       "Compilation requires the Tauri desktop app — you are running in a browser preview."
     );
   }
-  const raw = await invoke<RawCompileResult>("compile_tex", { path, content });
-  return {
-    pdf: raw.pdf ? Uint8Array.from(raw.pdf) : null,
-    log: raw.log,
-    success: raw.success,
-  };
+  // The backend emits one `compile-log` event per engine output line while
+  // Tectonic runs; the full transcript still arrives with the final result.
+  let unlisten: (() => void) | null = null;
+  if (onLogLine) {
+    unlisten = await listen<string>("compile-log", (event) =>
+      onLogLine(event.payload)
+    );
+  }
+  try {
+    const raw = await invoke<RawCompileResult>("compile_tex", { path, content });
+    return {
+      pdf: raw.pdf ? Uint8Array.from(raw.pdf) : null,
+      log: raw.log,
+      success: raw.success,
+    };
+  } finally {
+    unlisten?.();
+  }
 }
 
 /// Ask the backend to kill the running compile, if any. Safe to call with no
