@@ -52,10 +52,11 @@ function App() {
   }, [systemTheme]);
 
   // Apply theme class to document
+  const resolved = resolvedTheme();
   useEffect(() => {
     if (!ready) return;
-    document.documentElement.classList.toggle("dark", resolvedTheme() === "dark");
-  }, [resolvedTheme, ready]);
+    document.documentElement.classList.toggle("dark", resolved === "dark");
+  }, [resolved, ready]);
 
   // Persist theme changes
   useEffect(() => {
@@ -76,7 +77,7 @@ function App() {
 
   if (!ready) return null;
 
-  const isDark = resolvedTheme() === "dark";
+  const isDark = resolved === "dark";
 
   return (
     <TooltipProvider>
