@@ -31,7 +31,7 @@ export function useFirstLaunch(): void {
           setStatus("ready");
         } else {
           setError(
-            "No bundled TeX Live found. Reinstall TikzForge or run the TeX Live bundling step."
+            "No bundled Tectonic engine found. Reinstall TikzForge or run scripts/prepare-texlive.sh before building."
           );
           setStatus("error");
         }
