@@ -26,6 +26,34 @@ pub fn bundled_engine_path(resource_dir: &PathBuf, platform: Platform) -> PathBu
     resource_dir.join("tectonic").join(exe_name)
 }
 
+/// Dev-mode fallback locations for the staged engine.
+///
+/// `tauri dev` never bundles resources (on Linux the resource dir resolves
+/// to `<exe_dir>/../lib/<app>`, which holds no engine). Developers stage one
+/// via `scripts/prepare-texlive.sh` at `src-tauri/tectonic/`, so probe for it
+/// relative to the running executable (covers `src-tauri/target/debug/<exe>`)
+/// and relative to the working directory (covers repo root / `src-tauri/`).
+pub fn dev_staged_candidates(
+    exe_dir: &std::path::Path,
+    cwd: &std::path::Path,
+    platform: Platform,
+) -> Vec<PathBuf> {
+    let exe_name: &str = match platform {
+        Platform::Windows => "tectonic.exe",
+        _ => "tectonic",
+    };
+    let mut out = Vec::new();
+    let mut dir = Some(exe_dir);
+    for _ in 0..4 {
+        let Some(d) = dir else { break };
+        out.push(d.join("tectonic").join(exe_name));
+        dir = d.parent();
+    }
+    out.push(cwd.join("src-tauri").join("tectonic").join(exe_name));
+    out.push(cwd.join("tectonic").join(exe_name));
+    out
+}
+
 /// Ensure the staged binary is executable.
 ///
 /// Tauri's resource bundlers do not always preserve the Unix exec bit inside
@@ -89,6 +117,19 @@ pub fn resolve_engine(handle: &tauri::AppHandle) -> Engine {
             if path.is_file() {
                 // Best-effort: bundlers may strip the Unix exec bit.
                 let _ = ensure_executable(&path);
+                return Engine { path };
+            }
+        }
+        // `tauri dev` never bundles resources, so probe the source-tree
+        // staged location (`scripts/prepare-texlive.sh` output) before
+        // falling back to PATH.
+        let exe_dir = std::env::current_exe()
+            .ok()
+            .and_then(|p| p.parent().map(PathBuf::from))
+            .unwrap_or_default();
+        let cwd = std::env::current_dir().unwrap_or_default();
+        for path in dev_staged_candidates(&exe_dir, &cwd, platform) {
+            if path.is_file() {
                 return Engine { path };
             }
         }
@@ -181,5 +222,36 @@ mod tests {
         assert!(ensure_executable(&path).is_err());
         #[cfg(not(unix))]
         assert!(ensure_executable(&path).is_ok());
+    }
+
+    #[test]
+    fn dev_staged_candidates_find_src_tauri_tree_from_target_debug() {
+        let exe_dir = PathBuf::from("/repo/src-tauri/target/debug");
+        let cwd = PathBuf::from("/repo");
+        let candidates = dev_staged_candidates(&exe_dir, &cwd, Platform::Linux);
+        assert!(
+            candidates.contains(&PathBuf::from("/repo/src-tauri/tectonic/tectonic")),
+            "expected src-tauri staged path in {candidates:?}"
+        );
+    }
+
+    #[test]
+    fn dev_staged_candidates_cover_cwd_layouts() {
+        let exe_dir = PathBuf::from("/nowhere/bin");
+        let cwd = PathBuf::from("/repo");
+        let candidates = dev_staged_candidates(&exe_dir, &cwd, Platform::Linux);
+        assert!(candidates.contains(&PathBuf::from("/repo/src-tauri/tectonic/tectonic")));
+        assert!(candidates.contains(&PathBuf::from("/repo/tectonic/tectonic")));
+    }
+
+    #[test]
+    fn dev_staged_candidates_windows_uses_exe() {
+        let exe_dir = PathBuf::from("C:\\repo\\src-tauri\\target\\debug");
+        let cwd = PathBuf::from("C:\\repo");
+        let candidates = dev_staged_candidates(&exe_dir, &cwd, Platform::Windows);
+        assert!(candidates
+            .iter()
+            .all(|p| p.ends_with("tectonic.exe")));
+        assert!(!candidates.is_empty());
     }
 }

@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
 // Mock @tauri-apps/api/core
 vi.mock("@tauri-apps/api/core", () => ({
@@ -11,6 +11,11 @@ import { detectInstallation } from "../lib/latex-engine";
 describe("detectInstallation", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    (window as unknown as Record<string, unknown>).__TAURI_INTERNALS__ = {};
+  });
+
+  afterEach(() => {
+    delete (window as unknown as Record<string, unknown>).__TAURI_INTERNALS__;
   });
 
   it("returns path when the engine is detected", async () => {
@@ -36,5 +41,12 @@ describe("detectInstallation", () => {
     const result = await detectInstallation();
 
     expect(result).toEqual({ detected: false, path: null });
+  });
+
+  it("throws a browser-preview error outside the Tauri app", async () => {
+    delete (window as unknown as Record<string, unknown>).__TAURI_INTERNALS__;
+
+    await expect(detectInstallation()).rejects.toThrow(/browser preview/);
+    expect(invoke).not.toHaveBeenCalled();
   });
 });
