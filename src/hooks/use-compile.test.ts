@@ -168,8 +168,43 @@ describe("useCompile", () => {
     expect(state.isCompiling).toBe(false);
   });
 
-  it("cancel() clears the spinner and ignores the late result", async () => {
-    let resolveLate!: (v: {
+  it("appends streamed log lines live, then sets the final transcript", async () => {
+    type CompileValue = {
+      pdf: Uint8Array | null;
+      log: string;
+      success: boolean;
+    };
+    let capturedOnLog: ((line: string) => void) | undefined;
+    let resolveCompile!: (v: CompileValue) => void;
+    vi.mocked(compileDocument).mockImplementation((_path, _content, onLogLine) => {
+      capturedOnLog = onLogLine;
+      return new Promise<CompileValue>((resolve) => {
+        resolveCompile = resolve;
+      });
+    });
+    vi.mocked(parseCompilationLog).mockReturnValue([]);
+
+    const { result } = renderHook(() => useCompile());
+
+    let pending: Promise<void>;
+    act(() => {
+      pending = result.current.compile("/path/doc.tex", "content");
+    });
+    act(() => {
+      capturedOnLog?.("note: downloading foo");
+    });
+    expect(useDocumentStore.getState().compilationLog).toContain(
+      "note: downloading foo"
+    );
+
+    await act(async () => {
+      resolveCompile({ pdf: new Uint8Array([1]), log: "full transcript", success: true });
+      await pending;
+    });
+    expect(useDocumentStore.getState().compilationLog).toBe("full transcript");
+  });
+
+  it("cancel() clears the spinner and ignores the late result", async () => {    let resolveLate!: (v: {
       pdf: Uint8Array | null;
       log: string;
       success: boolean;

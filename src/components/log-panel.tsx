@@ -1,12 +1,18 @@
+import { useEffect, useRef } from "react";
 import { useDocumentStore } from "../store/document-store";
 
 /**
- * Raw transcript of the last finished compile (or the failure message).
- * The backend only returns output when Tectonic exits, so during a long
- * compile this shows the previous transcript — not a live stream.
+ * Raw engine transcript. Lines stream in live while Tectonic runs; when the
+ * compile settles, the store holds the complete transcript.
  */
 export function LogPanel() {
   const { compilationLog } = useDocumentStore();
+  const preRef = useRef<HTMLPreElement>(null);
+
+  useEffect(() => {
+    const el = preRef.current;
+    if (el) el.scrollTop = el.scrollHeight;
+  }, [compilationLog]);
 
   if (!compilationLog) {
     return (
@@ -18,6 +24,7 @@ export function LogPanel() {
 
   return (
     <pre
+      ref={preRef}
       role="region"
       aria-label="Compilation log"
       className="max-h-48 overflow-auto whitespace-pre-wrap px-3 py-2 font-mono text-xs text-muted-foreground"
