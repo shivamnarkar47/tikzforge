@@ -243,3 +243,150 @@ describe("useCompile", () => {
     expect(useDocumentStore.getState().isCompiling).toBe(false);
   });
 });
+
+describe("useCompile phase 2", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.mocked(parseCompilationLog).mockReturnValue([]);
+    vi.mocked(cancelCompile).mockResolvedValue(undefined);
+    useDocumentStore.setState({
+      filename: "",
+      content: "",
+      isDirty: false,
+      pdfData: null,
+      isCompiling: false,
+      compilationErrors: [],
+      compilationLog: "",
+      recentFiles: [],
+    });
+  });
+
+  it("returns phase and isCompiling", () => {
+    const { result } = renderHook(() => useCompile());
+    expect(result.current.phase).toBe("idle");
+    expect(result.current.isCompiling).toBe(false);
+    expect(typeof result.current.compile).toBe("function");
+    expect(typeof result.current.cancel).toBe("function");
+  });
+
+  it("sets phase to compiling and isCompiling true while compileDocument is pending", async () => {
+    let resolveCompile!: (v: any) => void;
+    vi.mocked(compileDocument).mockImplementation(
+      () => new Promise((resolve) => {
+        resolveCompile = resolve;
+      })
+    );
+
+    const { result } = renderHook(() => useCompile());
+
+    let pending!: Promise<void>;
+    act(() => {
+      pending = result.current.compile("/path/doc.tex", "content");
+    });
+
+    expect(result.current.phase).toBe("compiling");
+    expect(result.current.isCompiling).toBe(true);
+
+    await act(async () => {
+      resolveCompile({ pdf: new Uint8Array([1]), log: "ok", success: true });
+      await pending;
+    });
+
+    expect(result.current.phase).toBe("idle");
+    expect(result.current.isCompiling).toBe(false);
+  });
+
+  it("returns phase idle on error", async () => {
+    vi.mocked(compileDocument).mockRejectedValue(new Error("boom"));
+
+    const { result } = renderHook(() => useCompile());
+
+    await act(async () => {
+      await result.current.compile("/path/doc.tex", "content");
+    });
+
+    expect(result.current.phase).toBe("idle");
+    expect(result.current.isCompiling).toBe(false);
+  });
+
+  it("cancel sets phase to cancelling and calls cancelCompile", async () => {
+    let resolveCompile!: (v: any) => void;
+    vi.mocked(compileDocument).mockImplementation(
+      () => new Promise((resolve) => {
+        resolveCompile = resolve;
+      })
+    );
+
+    const { result } = renderHook(() => useCompile());
+
+    let pending!: Promise<void>;
+    act(() => {
+      pending = result.current.compile("/path/doc.tex", "content");
+    });
+
+    act(() => {
+      result.current.cancel();
+    });
+
+    expect(result.current.phase).toBe("cancelling");
+    expect(cancelCompile).toHaveBeenCalledTimes(1);
+
+    await act(async () => {
+      resolveCompile({ pdf: new Uint8Array([1]), log: "late", success: true });
+      try {
+        await pending;
+      } catch {
+        // ignore
+      }
+    });
+  });
+
+  it("does not call compileDocument again immediately when one is in flight; queues and recompiles after settle", async () => {
+    let resolveFirst!: (v: any) => void;
+    const first = new Promise<any>((resolve) => {
+      resolveFirst = resolve;
+    });
+    vi.mocked(compileDocument)
+      .mockReturnValueOnce(first)
+      .mockResolvedValueOnce({ pdf: new Uint8Array([2]), log: "second", success: true });
+
+    const { result } = renderHook(() => useCompile());
+
+    let p1!: Promise<void>;
+    act(() => {
+      p1 = result.current.compile("/path/doc.tex", "first");
+    });
+
+    let p2!: Promise<void>;
+    act(() => {
+      p2 = result.current.compile("/path/doc.tex", "second");
+    });
+
+    expect(vi.mocked(compileDocument)).toHaveBeenCalledTimes(1);
+    expect(result.current.phase).toBe("queued");
+
+    await act(async () => {
+      resolveFirst({ pdf: new Uint8Array([1]), log: "first", success: true });
+    });
+
+    await vi.waitFor(() => {
+      expect(vi.mocked(compileDocument)).toHaveBeenCalledTimes(2);
+    }, { timeout: 1000 });
+
+    await act(async () => {
+      try {
+        await p1;
+      } catch {
+        // ignore
+      }
+      try {
+        await p2;
+      } catch {
+        // ignore
+      }
+      await new Promise((r) => setTimeout(r, 0));
+    });
+
+    expect(result.current.phase).toBe("idle");
+  });
+});

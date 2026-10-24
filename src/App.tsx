@@ -46,7 +46,7 @@ function App() {
   } = useDocumentStore();
   const { theme, setTheme, setSystemTheme, resolvedTheme } = useThemeStore();
   const systemTheme = useSystemTheme();
-  const { compile, cancel } = useCompile();
+  const { compile, cancel, phase } = useCompile();
   useFirstLaunch();
   const [ready, setReady] = useState(false);
   const [showLog, setShowLog] = useState(false);
@@ -250,6 +250,15 @@ function App() {
               </TooltipTrigger>
               <TooltipContent>Mark document as saved</TooltipContent>
             </Tooltip>
+            <span aria-label="Compile status">
+              {phase === "compiling"
+                ? "Compiling…"
+                : phase === "cancelling"
+                ? "Cancelling…"
+                : phase === "queued"
+                ? "Queued…"
+                : "Idle"}
+            </span>
             <CompileButton
               onCompile={() => void compile(filename, content)}
               onCancel={() => cancel()}
