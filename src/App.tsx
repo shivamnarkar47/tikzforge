@@ -13,7 +13,7 @@ import { Input } from "./components/ui/input";
 import { Toggle } from "./components/ui/toggle";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "./components/ui/tabs";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "./components/ui/tooltip";
-import { Moon, Sun, Save, ScrollText } from "lucide-react";
+import { Moon, Sun, Save, ScrollText, FolderOpen } from "lucide-react";
 import { useEffect, useState, useCallback } from "react";
 import { useThemeStore } from "./store/theme-store";
 import { useSystemTheme } from "./hooks/use-system-theme";
@@ -185,8 +185,8 @@ function App() {
     <TooltipProvider>
       <FirstLaunchGate>
         <div className="h-screen w-screen flex flex-col bg-background text-foreground">
-          <header className="flex items-center gap-2 border-b px-3 py-2">
-            <span className="text-sm font-semibold shrink-0">TikzForge</span>
+          <header className="flex flex-wrap items-center gap-2 border-b bg-background/80 px-3 py-2 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+            <span className="text-sm font-semibold shrink-0 tracking-tight">TikzForge</span>
             <Input
               aria-label="Filename"
               value={filename}
@@ -195,11 +195,14 @@ function App() {
               placeholder="untitled.tex"
             />
             {isDirty && (
-              <span className="text-xs text-muted-foreground shrink-0">● unsaved</span>
+              <span className="text-xs text-muted-foreground shrink-0" aria-live="polite">
+                ● unsaved
+              </span>
             )}
             <select
               aria-label="Templates"
               defaultValue=""
+              className="h-8 rounded-md border border-input bg-background px-2 text-sm focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1"
               onChange={(e) => {
                 const tpl = TEMPLATES.find((t) => t.name === e.target.value);
                 if (tpl) setContent(tpl.code);
@@ -215,6 +218,7 @@ function App() {
             <select
               aria-label="Recent files"
               defaultValue=""
+              className="h-8 rounded-md border border-input bg-background px-2 text-sm focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1"
               onChange={(e) => {
                 if (e.target.value) void handleOpenRecent(e.target.value);
               }}
@@ -227,9 +231,9 @@ function App() {
               ))}
             </select>
             <div className="flex-1" />
-            <span aria-label="Update status">
+            <span aria-label="Update status" className="text-xs text-muted-foreground">
               {updateChecking
-                ? "Checking..."
+                ? "Checking…"
                 : updateInfo?.available
                 ? "Update available"
                 : "Up to date"}
@@ -243,14 +247,23 @@ function App() {
             </Toggle>
             <Tooltip>
               <TooltipTrigger asChild>
-                <Button variant="outline" size="sm" onClick={markSaved}>
+                <Button variant="outline" size="sm" onClick={() => void handleOpen()}>
+                  <FolderOpen />
+                  Open
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Open a .tex file</TooltipContent>
+            </Tooltip>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button variant="outline" size="sm" onClick={handleSave}>
                   <Save />
                   Save
                 </Button>
               </TooltipTrigger>
-              <TooltipContent>Mark document as saved</TooltipContent>
+              <TooltipContent>Save document to disk</TooltipContent>
             </Tooltip>
-            <span aria-label="Compile status">
+            <span aria-label="Compile status" aria-live="polite" className="text-xs text-muted-foreground">
               {phase === "compiling"
                 ? "Compiling…"
                 : phase === "cancelling"
@@ -281,38 +294,61 @@ function App() {
             </Toggle>
           </header>
           {tabs.length > 0 && (
-            <div className="flex items-center gap-1 border-b px-3 py-1">
-              {tabs.map((tab) => (
-                <div key={tab.id} className="flex items-center gap-1">
-                  <button
-                    type="button"
-                    onClick={() => setActiveTab(tab.id)}
-                    aria-pressed={activeTabId === tab.id}
-                  >
-                    {tab.filename}
-                  </button>
-                  <button
-                    type="button"
-                    aria-label={`Close ${tab.filename}`}
-                    onClick={() => requestClose(tab.id)}
-                  >
-                    ×
-                  </button>
-                </div>
-              ))}
+            <div
+              className="flex items-center gap-1 border-b bg-muted/30 px-3 py-1"
+              role="tablist"
+              aria-label="Open documents"
+            >
+              {tabs.map((tab) => {
+                const active = activeTabId === tab.id;
+                return (
+                  <div key={tab.id} className="flex items-center gap-0.5">
+                    <button
+                      type="button"
+                      role="tab"
+                      aria-selected={active}
+                      onClick={() => setActiveTab(tab.id)}
+                      className={
+                        "rounded-md px-2 py-0.5 text-xs transition-colors " +
+                        (active
+                          ? "bg-background text-foreground shadow-sm"
+                          : "text-muted-foreground hover:bg-background/60 hover:text-foreground")
+                      }
+                    >
+                      {tab.filename}
+                    </button>
+                    <button
+                      type="button"
+                      aria-label={`Close ${tab.filename}`}
+                      onClick={() => requestClose(tab.id)}
+                      className="rounded-md px-1 py-0.5 text-xs text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
+                    >
+                      ×
+                    </button>
+                  </div>
+                );
+              })}
             </div>
           )}
           {pendingCloseTabId && (
             <div
-              className="flex items-center gap-2 border-b px-3 py-1"
+              className="flex items-center gap-2 border-b bg-destructive/5 px-3 py-1"
               role="alertdialog"
               aria-label="Confirm close tab"
             >
               <span className="text-xs">Close tab with unsaved changes?</span>
-              <button type="button" onClick={() => forceClose(pendingCloseTabId)}>
+              <button
+                type="button"
+                onClick={() => forceClose(pendingCloseTabId)}
+                className="rounded-md bg-destructive px-2 py-0.5 text-xs text-destructive-foreground transition-colors hover:bg-destructive/90"
+              >
                 Discard
               </button>
-              <button type="button" onClick={cancelClose}>
+              <button
+                type="button"
+                onClick={cancelClose}
+                className="rounded-md border border-input bg-background px-2 py-0.5 text-xs transition-colors hover:bg-accent"
+              >
                 Cancel
               </button>
             </div>

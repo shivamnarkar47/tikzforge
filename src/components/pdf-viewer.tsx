@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { FileText } from "lucide-react";
 
 interface PdfViewerProps {
   pdfData: Uint8Array | null;
@@ -22,7 +23,8 @@ export function PdfViewer({ pdfData }: PdfViewerProps) {
 
   if (!url) {
     return (
-      <div className="pdf-viewer flex h-full flex-col items-center justify-center gap-2 bg-muted/30 p-6 text-center">
+      <div className="pdf-viewer flex h-full flex-col items-center justify-center gap-3 bg-muted/30 p-6 text-center">
+        <FileText className="size-10 text-muted-foreground/60" aria-hidden="true" />
         <p className="text-sm font-medium">No PDF loaded</p>
         <p className="text-xs text-muted-foreground">
           Press Compile to build your document and preview it here.

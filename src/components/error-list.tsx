@@ -12,7 +12,12 @@ export function ErrorList({ onSelect }: ErrorListProps) {
   if (compilationErrors.length === 0) return null;
 
   return (
-    <ScrollArea className="error-list border border-destructive/30 rounded-md bg-destructive/5 max-h-40">
+    <ScrollArea
+      className="error-list border border-destructive/30 rounded-md bg-destructive/5 max-h-40"
+      role="region"
+      aria-label="Compilation errors"
+      aria-live="polite"
+    >
       <div className="p-2">
         {compilationErrors.map((error, i) => (
           <button
