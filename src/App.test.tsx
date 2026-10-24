@@ -80,3 +80,68 @@ describe("App", () => {
     expect(document.documentElement.classList.contains("dark")).toBe(false);
   });
 });
+
+describe("App P0 wiring", () => {
+  beforeEach(() => {
+    useLatexEngineStore.setState({
+      status: "ready",
+      installProgress: 0,
+      pdflatexPath: "/app/texlive/pdflatex",
+      error: null,
+    });
+    vi.mocked(detectInstallation).mockResolvedValue({
+      detected: true,
+      path: "/app/texlive/pdflatex",
+    });
+    useThemeStore.setState({ theme: "light", systemTheme: "light" });
+    document.documentElement.classList.remove("dark");
+  });
+
+  it("renders auto-compile toggle", () => {
+    render(<App />);
+    const toggle = screen.getByRole("button", { name: /toggle auto-compile/i });
+    expect(toggle).toBeInTheDocument();
+  });
+
+  it("toggles auto-compile pressed state", () => {
+    render(<App />);
+    const toggle = screen.getByRole("button", { name: /toggle auto-compile/i });
+    expect(toggle).toHaveAttribute("aria-pressed", "true");
+
+    fireEvent.click(toggle);
+    expect(toggle).toHaveAttribute("aria-pressed", "false");
+
+    fireEvent.click(toggle);
+    expect(toggle).toHaveAttribute("aria-pressed", "true");
+  });
+
+  it("renders recent files selector", () => {
+    render(<App />);
+    const select = screen.getByLabelText("Recent files");
+    expect(select).toBeInTheDocument();
+  });
+
+  it("renders update status", async () => {
+    render(<App />);
+    const status = await screen.findByText(/up to date/i, {}, { timeout: 3000 });
+    expect(status).toBeInTheDocument();
+  });
+
+  it("renders document tabs after load", async () => {
+    render(<App />);
+    const closeBtn = await screen.findByRole(
+      "button",
+      { name: /close untitled\.tex/i },
+      { timeout: 3000 }
+    );
+    expect(closeBtn).toBeInTheDocument();
+  });
+
+  it("handles Ctrl+S without crashing", async () => {
+    render(<App />);
+    await screen.findByText(/up to date/i, {}, { timeout: 3000 });
+    expect(() => {
+      fireEvent.keyDown(window, { key: "s", ctrlKey: true });
+    }).not.toThrow();
+  });
+});

@@ -1,4 +1,5 @@
-import { invoke } from "@tauri-apps/api/core";
+import { check } from "@tauri-apps/plugin-updater";
+import { isTauri } from "./tauri";
 
 export interface UpdateInfo {
   available: boolean;
@@ -27,12 +28,22 @@ export function compareVersions(a: string, b: string): number {
 }
 
 /**
- * Check for application updates via Tauri updater.
+ * Check for application updates via the Tauri updater plugin.
  */
 export async function checkForUpdates(): Promise<UpdateInfo> {
+  if (!isTauri()) {
+    return { available: false };
+  }
   try {
-    const result = await invoke<UpdateInfo>("check_update");
-    return result;
+    const update = await check();
+    if (update) {
+      return {
+        available: true,
+        version: update.version,
+        body: update.body ?? undefined,
+      };
+    }
+    return { available: false };
   } catch {
     return { available: false };
   }

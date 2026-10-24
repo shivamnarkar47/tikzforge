@@ -1,10 +1,15 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
-vi.mock("@tauri-apps/api/core", () => ({
-  invoke: vi.fn(),
+vi.mock("./tauri", () => ({
+  isTauri: vi.fn(() => true),
 }));
 
-import { invoke } from "@tauri-apps/api/core";
+vi.mock("@tauri-apps/plugin-updater", () => ({
+  check: vi.fn(),
+}));
+
+import { isTauri } from "./tauri";
+import { check } from "@tauri-apps/plugin-updater";
 import { checkForUpdates, compareVersions } from "../lib/updater";
 
 describe("compareVersions", () => {
@@ -31,28 +36,25 @@ describe("compareVersions", () => {
 describe("checkForUpdates", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.mocked(isTauri).mockReturnValue(true);
   });
 
   it("returns update info when available", async () => {
-    vi.mocked(invoke).mockResolvedValue({
-      available: true,
+    vi.mocked(check).mockResolvedValue({
       version: "1.1.0",
-      currentVersion: "1.0.0",
       body: "New features added",
-    });
+      downloadAndInstall: vi.fn(),
+    } as any);
 
     const result = await checkForUpdates();
 
-    expect(invoke).toHaveBeenCalledWith("check_update");
+    expect(check).toHaveBeenCalled();
     expect(result.available).toBe(true);
     expect(result.version).toBe("1.1.0");
   });
 
   it("returns not available when no update", async () => {
-    vi.mocked(invoke).mockResolvedValue({
-      available: false,
-      currentVersion: "1.0.0",
-    });
+    vi.mocked(check).mockResolvedValue(null);
 
     const result = await checkForUpdates();
 
@@ -60,10 +62,19 @@ describe("checkForUpdates", () => {
   });
 
   it("handles check failure gracefully", async () => {
-    vi.mocked(invoke).mockRejectedValue(new Error("Network error"));
+    vi.mocked(check).mockRejectedValue(new Error("Network error"));
 
     const result = await checkForUpdates();
 
+    expect(result.available).toBe(false);
+  });
+
+  it("returns not available outside Tauri", async () => {
+    vi.mocked(isTauri).mockReturnValue(false);
+
+    const result = await checkForUpdates();
+
+    expect(check).not.toHaveBeenCalled();
     expect(result.available).toBe(false);
   });
 });

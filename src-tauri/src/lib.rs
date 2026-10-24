@@ -150,8 +150,9 @@ fn compile_tex(handle: tauri::AppHandle, path: String, content: String) -> Resul
 
     let engine = resolve_engine(&handle);
     // Tectonic is self-contained: handles its own dependency downloads and
-    // produces a single-pass PDF. No -synctex or -shell-escape flags needed.
+    // produces a single-pass PDF. Enable SyncTeX data (--synctex=1 equivalent).
     let mut child = Command::new(&engine.path)
+        .arg("--synctex")
         .arg(&file_name)
         .current_dir(&dir)
         .stdout(Stdio::piped())
@@ -254,18 +255,14 @@ fn check_update() -> UpdateInfo {
     UpdateInfo { available: false }
 }
 
-// Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
-#[tauri::command]
-fn greet(name: &str) -> String {
-    format!("Hello, {}! You've been greeted from Rust!", name)
-}
-
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_fs::init())
+        .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_updater::Builder::new().build())
         .invoke_handler(tauri::generate_handler![
-            greet,
             compile_tex,
             cancel_compile,
             detect_engine,
