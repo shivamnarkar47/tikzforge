@@ -1,0 +1,250 @@
+% !TeX program = pdflatex
+% TikzForge — Technical Documentation
+% Compile with: pdflatex technical-documentation.tex (twice for TOC)
+\documentclass[11pt,a4paper]{report}
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{geometry}
+\geometry{margin=2.2cm}
+\usepackage{hyperref}
+\hypersetup{colorlinks=true, linkcolor=blue!60!black, urlcolor=blue!60!black}
+\usepackage{listings}
+\usepackage{xcolor}
+\usepackage{booktabs}
+\usepackage{enumitem}
+\usepackage{titlesec}
+\usepackage{fancyhdr}
+\usepackage{graphicx}
+
+% Code listing style
+\definecolor{codebg}{RGB}{245,245,245}
+\definecolor{codeframe}{RGB}{200,200,200}
+\lstset{
+  backgroundcolor=\color{codebg},
+  frame=single,
+  rulecolor=\color{codeframe},
+  basicstyle=\ttfamily\small,
+  keywordstyle=\color{blue!70!black}\bfseries,
+  commentstyle=\color{gray}\itshape,
+  stringstyle=\color{green!50!black},
+  breaklines=true,
+  showstringspaces=false,
+  tabsize=2,
+  captionpos=b,
+}
+
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[L]{TikzForge — Technical Documentation}
+\fancyhead[R]{\thepage}
+\renewcommand{\headrulewidth}{0.4pt}
+
+\title{\textbf{TikzForge}\\[4pt]\large Technical Documentation}
+\author{Shivam Narkar}
+\date{Version 0.2.1 — October 2026}
+
+\begin{document}
+\maketitle
+\tableofcontents
+\newpage
+
+% ============================================================
+\chapter{Introduction}
+% ============================================================
+
+\section{Problem Statement}
+LaTeX users working with TikZ diagrams must compile from the command line, parse cryptic error logs, and constantly switch between editor and PDF viewer. This friction makes the inherently trial-and-error process of building TikZ figures painfully slow.
+
+\section{Solution}
+TikzForge is a native desktop application where a user opens a \texttt{.tex} file, edits it, and sees the compiled PDF update automatically two seconds after they stop typing. Clicking the PDF jumps the editor to the source line that produced it (forward SyncTeX). Compilation errors appear as a clickable list that jumps to the offending line.
+
+\section{Target Users}
+\begin{itemize}
+  \item LaTeX users, researchers, and students building TikZ figures.
+  \item Developers who want a fast, native-feeling editor without managing a TeX distribution manually.
+\end{itemize}
+
+% ============================================================
+\chapter{Architecture Overview}
+% ============================================================
+
+TikzForge uses a \textbf{Tauri v2} architecture: a web-based frontend (React) rendered in a system webview, backed by a Rust core for process management, file I/O, and engine detection.
+
+\begin{center}
+\begin{tabular}{ll}
+\toprule
+\textbf{Layer} & \textbf{Technology} \\
+\midrule
+Frontend & React 19 + TypeScript + Vite \\
+Styling  & Tailwind CSS v4 + beUI + shadcn/ui (Radix) \\
+Editor   & CodeMirror 6 (custom LaTeX stream language) \\
+State    & Zustand \\
+Backend  & Tauri v2 (Rust) \\
+PDF      & PDF.js (via \texttt{<iframe>}) \\
+Engine   & Bundled Tectonic / minimal TeX Live \\
+Updater  & Tauri updater plugin \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\section{Communication}
+The frontend invokes Rust commands through Tauri's \texttt{invoke} API with typed TypeScript interfaces. Heavy work (compilation, file system, engine detection) lives in Rust; the UI stays responsive.
+
+% ============================================================
+\chapter{Frontend}
+% ============================================================
+
+\section{Entry Point and Routing}
+The app is a single-page application. \texttt{src/main.tsx} mounts \texttt{App.tsx}, which composes the toolbar, tab strip, error list, log panel, and the resizable editor/PDF split view.
+
+\section{State Management (Zustand)}
+Four stores drive the UI:
+\begin{itemize}
+  \item \texttt{document-store} — content, filename, dirty flag, PDF data, compilation errors/log, recent files.
+  \item \texttt{tab-store} — open documents, active tab, pending-close guard.
+  \item \texttt{theme-store} — light/dark/system preference and resolved theme.
+  \item \texttt{latex-engine-store} — engine detection status and progress.
+\end{itemize}
+
+\section{Editor (CodeMirror 6)}
+\texttt{src/components/editor.tsx} builds a CodeMirror instance with:
+\begin{itemize}
+  \item A custom LaTeX \texttt{StreamLanguage} tokenizer (commands, comments, math, braces, numbers).
+  \item Line numbers, active-line highlight, history, bracket matching, close-brackets.
+  \item Autocompletion of \textasciitilde 90 common LaTeX/TikZ commands.
+  \item Search panel (\texttt{Ctrl+F}), code folding, lint gutter.
+  \item Compilation errors pushed into the lint system to mark offending lines.
+  \item Kanagawa theme (Wave in dark mode, Lotus in light mode).
+\end{itemize}
+
+\section{UI Shell (beUI + shadcn/ui)}
+The UI uses beUI animated components (Button, Input, Tabs, Tooltip, MorphingModal, CommandPalette, AnimatedToastStack) built on Radix primitives and Tailwind CSS v4 tokens. A design-system pass established CSS-variable theming with dark/light palettes in \texttt{src/index.css}.
+
+\section{Keyboard Shortcuts}
+\begin{itemize}
+  \item \texttt{Ctrl+S} — save document.
+  \item \texttt{Ctrl+O} — open file.
+  \item \texttt{Ctrl+Enter} — compile.
+  \item \texttt{Ctrl+K} — command palette.
+  \item \texttt{Ctrl+F} — find in editor.
+\end{itemize}
+
+% ============================================================
+\chapter{Backend (Rust / Tauri)}
+% ============================================================
+
+\section{Engine Management}
+On first launch the app detects an existing LaTeX installation. If none is found, it downloads and caches a minimal TeX Live bundle (\textasciitilde 300 MB) with \texttt{pdflatex} and TikZ packages. Detection status is surfaced through \texttt{FirstLaunchGate}.
+
+\section{Compilation Pipeline}
+\begin{enumerate}
+  \item Frontend sends \texttt{filename} + \texttt{content} to the \texttt{compile} command.
+  \item Rust writes the content to disk and invokes \texttt{pdflatex} with flags \texttt{-interaction=nonstopmode}, \texttt{-shell-escape}, \texttt{-synctex=1}.
+  \item Engine output streams live into the Logs panel.
+  \item On success, the generated PDF is read as bytes and returned; on failure, the log is parsed into structured errors.
+  \item A generation counter ensures a stale compile never overwrites fresh state.
+\end{enumerate}
+
+\section{Auto-Compile}
+A 2-second debounce after the last keystroke triggers compilation. A queue-while-busy policy ensures new edits wait for the in-flight compile to finish, then recompile. Auto-compile is toggled from the toolbar and persisted.
+
+\section{SyncTeX (Forward Sync)}
+Compiling with \texttt{-synctex=1} produces a \texttt{.synctex.gz} file. Clicking a point in the PDF parses the synctex data and jumps the editor to the corresponding source line.
+
+\section{File Operations}
+Open, save, auto-save (every 30s), recent files list, drag-and-drop, and unclean-shutdown restore are handled through Tauri's \texttt{plugin-fs} and \texttt{plugin-dialog}.
+
+\section{Persistence}
+Window geometry, divider position, theme, and auto-compile preference are persisted via \texttt{saveState}/\texttt{loadState} (JSON in app data) and restored on launch.
+
+\section{Auto-Updater}
+Tauri's updater plugin checks GitHub Releases on startup. The header shows checking/available/up-to-date status.
+
+% ============================================================
+\chapter{Data Flow}
+% ============================================================
+
+\begin{enumerate}
+  \item User edits text $\rightarrow$ \texttt{setContent} updates the Zustand store $\rightarrow$ CodeMirror reflects the change.
+  \item Debounced auto-compile (or \texttt{Ctrl+Enter}) calls \texttt{compile(filename, content)}.
+  \item Rust compiles and returns PDF bytes or parsed errors.
+  \item Store updates \texttt{pdfData} / \texttt{compilationErrors} / \texttt{compilationLog}.
+  \item \texttt{PdfViewer} renders the PDF via \texttt{<iframe>} with an object URL; \texttt{ErrorList} renders clickable errors.
+\end{enumerate}
+
+% ============================================================
+\chapter{Build and Release}
+% ============================================================
+
+\section{Development}
+\begin{lstlisting}[language=bash]
+bun install
+bun run tauri dev   # Vite on :1420 + Tauri window
+bunx vitest run     # tests
+bunx tsc --noEmit   # type check
+\end{lstlisting}
+
+\section{Production Build}
+\begin{lstlisting}[language=bash]
+bun run tauri build
+\end{lstlisting}
+Outputs Linux \texttt{.AppImage}/\texttt{.deb} and Windows NSIS \texttt{.exe}.
+
+\section{Release Process}
+Pushing a \texttt{v*} tag triggers \texttt{.github/workflows/release.yml}, which builds both platforms and publishes a GitHub Release. The app's updater reads \texttt{latest.json} from that release.
+
+% ============================================================
+\chapter{Testing}
+% ============================================================
+
+\begin{itemize}
+  \item Framework: Vitest + React Testing Library + jsdom.
+  \item 27 test files, 164 tests covering stores, pure functions, and components.
+  \item CodeMirror-dependent tests mock \texttt{react-resizable-panels}; jsdom lacks \texttt{ResizeObserver}, so it is polyfilled in \texttt{src/test/setup.tsx}.
+  \item TDD is followed: red $\rightarrow$ green $\rightarrow$ refactor, one seam at a time.
+\end{itemize}
+
+% ============================================================
+\chapter{Future Scope: Migrating to GPUI}
+% ============================================================
+
+\section{What is GPUI?}
+GPUI is Zed's Rust-native UI framework: a GPU-accelerated, immediate-mode-ish retained UI toolkit with its own layout, text shaping, and rendering pipeline. It enables building desktop apps entirely in Rust without a webview.
+
+\section{Motivation}
+\begin{itemize}
+  \item \textbf{Performance}: no webview overhead; native rendering and lower memory footprint.
+  \item \textbf{Native feel}: OS-native widgets, menus, and keyboard handling.
+  \item \textbf{Single language}: entire app in Rust, eliminating the TS/Rust boundary and \texttt{invoke} boilerplate.
+  \item \textbf{Smaller binaries}: no embedded web assets or Chromium/WebKit runtime.
+\end{itemize}
+
+\section{Challenges}
+\begin{itemize}
+  \item \textbf{Ecosystem}: GPUI is young and tightly coupled to Zed's needs; third-party component libraries are scarce compared to the React/shadcn ecosystem.
+  \item \textbf{CodeMirror replacement}: the editor is the heart of the app. GPUI has no drop-in equivalent to CodeMirror 6's LaTeX highlighting, autocomplete, and linting. A port or binding (e.g., via \texttt{rope} + custom highlighter) is required.
+  \item \textbf{PDF rendering}: PDF.js would be replaced by a Rust PDF renderer (e.g., \texttt{pdfium}, \texttt{mupdf}), with significant integration work.
+  \item \textbf{Development velocity}: losing React's component ecosystem and hot-reload DX slows iteration.
+  \item \textbf{Testing}: GPUI's testing story is less mature than Vitest + RTL.
+\end{itemize}
+
+\section{Migration Strategy (Phased)}
+\begin{enumerate}
+  \item \textbf{Phase 1 — Backend parity}: keep Tauri, but move more logic to Rust (already mostly there). No UI change.
+  \item \textbf{Phase 2 — GPUI shell prototype}: build a minimal GPUI window rendering the toolbar and a text area; validate rendering and input handling.
+  \item \textbf{Phase 3 — Editor port}: implement LaTeX highlighting and basic editing in GPUI (or embed a Rust editor crate such as \texttt{helix-core}/\texttt{lapce-core}).
+  \item \textbf{Phase 4 — PDF viewer}: integrate a Rust PDF renderer and SyncTeX mapping.
+  \item \textbf{Phase 5 — Feature parity}: tabs, theming, persistence, updater, dialogs.
+  \item \textbf{Phase 6 — Cutover}: replace Tauri frontend entirely; retire webview.
+\end{enumerate}
+
+\section{Recommendation}
+GPUI is a compelling long-term direction for performance and native feel, but the cost of reimplementing the editor and PDF viewer is high. A pragmatic path is to \textbf{keep Tauri + React for now} (maximizing iteration speed and leveraging CodeMirror/PDF.js) and revisit GPUI once the product is feature-complete and performance bottlenecks are measured. A hybrid approach — GPUI for the chrome, webview for the editor — is also possible but adds complexity.
+
+% ============================================================
+\chapter{Conclusion}
+% ============================================================
+
+TikzForge delivers a focused, native desktop LaTeX/TikZ editing experience by combining Tauri's small footprint with React's rich ecosystem. The architecture keeps the UI responsive, the compile pipeline robust, and the UX polished (auto-compile, SyncTeX, error navigation, theming). Future work includes full template libraries, multi-file projects, macOS support, and a potential long-term migration to a native Rust UI (GPUI).
+
+\end{document}
