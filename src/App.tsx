@@ -15,7 +15,7 @@ import { Tooltip } from "./components/motion/tooltip";
 import { MorphingModal } from "./components/motion/morphing-modal";
 import { CommandPalette } from "./components/motion/command-palette";
 import { useAnimatedToastStack, AnimatedToastStack } from "./components/motion/animated-toast-stack";
-import { Moon, Sun, Save, ScrollText, FolderOpen } from "lucide-react";
+import { Moon, Sun, Save, ScrollText, FolderOpen, Download } from "lucide-react";
 import { useEffect, useState, useCallback, useMemo } from "react";
 import { useThemeStore } from "./store/theme-store";
 import { useSystemTheme } from "./hooks/use-system-theme";
@@ -30,8 +30,8 @@ import { useUpdater } from "./hooks/use-updater";
 import { useTabStore } from "./store/tab-store";
 import { isTauri } from "./lib/tauri";
 import { TEMPLATES } from "./lib/templates";
-import { open as openDialog } from "@tauri-apps/plugin-dialog";
-import { readTextFile, writeTextFile } from "@tauri-apps/plugin-fs";
+import { open as openDialog, save as saveDialog } from "@tauri-apps/plugin-dialog";
+import { readTextFile, writeTextFile, writeFile } from "@tauri-apps/plugin-fs";
 
 function App() {
   const {
@@ -114,6 +114,21 @@ function App() {
       writeTextFile(filename, content).catch(() => {});
     }
   }, [markSaved, filename, content]);
+
+  const handleExport = useCallback(async () => {
+    if (!isTauri() || !pdfData) return;
+    try {
+      const selected = await saveDialog({
+        defaultPath: (filename || "document").replace(/\.tex$/i, ".pdf"),
+        filters: [{ name: "PDF", extensions: ["pdf"] }],
+      });
+      if (typeof selected === "string") {
+        await writeFile(selected, pdfData);
+      }
+    } catch {
+      // best effort
+    }
+  }, [pdfData, filename]);
 
   const handleAutoSave = useCallback(() => {
     if (isDirty) markSaved();
@@ -305,6 +320,12 @@ function App() {
             <Button variant="outline" size="sm" onClick={handleSave}>
               <Save />
               Save
+            </Button>
+          </Tooltip>
+          <Tooltip content="Export compiled PDF">
+            <Button variant="outline" size="sm" disabled={!pdfData} onClick={() => void handleExport()}>
+              <Download />
+              Export
             </Button>
           </Tooltip>
           <span aria-label="Compile status" aria-live="polite" className="text-xs text-muted-foreground">
