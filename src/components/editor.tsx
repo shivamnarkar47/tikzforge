@@ -16,7 +16,6 @@ import {
   bracketMatching,
   StreamLanguage,
   syntaxHighlighting,
-  defaultHighlightStyle,
   foldGutter,
   foldKeymap,
 } from "@codemirror/language";
@@ -78,23 +77,38 @@ const LATEX_COMMANDS = [
 ];
 
 // Monokai highlight style (dark).
-const monokaiHighlight = HighlightStyle.define([
-  { tag: tags.comment, color: "#75715e", fontStyle: "italic" },
-  { tag: tags.keyword, color: "#f92672" },
-  { tag: tags.string, color: "#e6db74" },
-  { tag: tags.number, color: "#ae81ff" },
-  { tag: tags.punctuation, color: "#f8f8f2" },
-  { tag: tags.bracket, color: "#f8f8f2" },
-  { tag: tags.variableName, color: "#f8f8f2" },
-  { tag: tags.operator, color: "#f92672" },
-  { tag: tags.typeName, color: "#a6e22e" },
-  { tag: tags.name, color: "#66d9ef" },
-  { tag: tags.number, color: "#ae81ff" },
-  { tag: tags.propertyName, color: "#a6e22e" },
-  { tag: tags.className, color: "#a6e22e", fontStyle: "italic" },
-  { tag: tags.tagName, color: "#f92672" },
-  { tag: tags.attributeName, color: "#a6e22e" },
-  { tag: tags.attributeValue, color: "#e6db74" },
+const kanagawaWaveHighlight = HighlightStyle.define([
+  { tag: tags.comment, color: "#727169", fontStyle: "italic" },
+  { tag: tags.keyword, color: "#957FB8" },
+  { tag: tags.string, color: "#98BB6C" },
+  { tag: tags.number, color: "#D27E99" },
+  { tag: tags.punctuation, color: "#9CABCA" },
+  { tag: tags.bracket, color: "#9CABCA" },
+  { tag: tags.variableName, color: "#DCD7BA" },
+  { tag: tags.operator, color: "#C34043" },
+  { tag: tags.typeName, color: "#7FB4CA" },
+  { tag: tags.name, color: "#7E9CD8" },
+  { tag: tags.propertyName, color: "#7FB4CA" },
+  { tag: tags.tagName, color: "#E46876" },
+  { tag: tags.attributeName, color: "#98BB6C" },
+  { tag: tags.attributeValue, color: "#98BB6C" },
+]);
+
+const kanagawaLotusHighlight = HighlightStyle.define([
+  { tag: tags.comment, color: "#8a8980", fontStyle: "italic" },
+  { tag: tags.keyword, color: "#624485" },
+  { tag: tags.string, color: "#6f894e" },
+  { tag: tags.number, color: "#b35b79" },
+  { tag: tags.punctuation, color: "#6f6f6f" },
+  { tag: tags.bracket, color: "#6f6f6f" },
+  { tag: tags.variableName, color: "#545464" },
+  { tag: tags.operator, color: "#c34043" },
+  { tag: tags.typeName, color: "#4e8ca2" },
+  { tag: tags.name, color: "#4d699b" },
+  { tag: tags.propertyName, color: "#4e8ca2" },
+  { tag: tags.tagName, color: "#c34043" },
+  { tag: tags.attributeName, color: "#6f894e" },
+  { tag: tags.attributeValue, color: "#6f894e" },
 ]);
 
 const noOpLinter = linter(() => []);
@@ -103,24 +117,27 @@ const themeCompartment = new Compartment();
 
 function lightExtensions() {
   return [
-    syntaxHighlighting(defaultHighlightStyle, { fallback: true }),
+    syntaxHighlighting(kanagawaLotusHighlight),
     EditorView.theme({
-      "&": { backgroundColor: "#ffffff", color: "#1f2937" },
-      ".cm-gutters": { backgroundColor: "#f3f4f6", color: "#6b7280", border: "none" },
+      "&": { backgroundColor: "#f2ecbc", color: "#545464" },
+      ".cm-gutters": { backgroundColor: "#e8e2b8", color: "#8a8980", border: "none" },
+      ".cm-activeLine": { backgroundColor: "#e8e2b8" },
+      ".cm-selectionBackground, ::selection": { backgroundColor: "#c9c39a" },
+      ".cm-cursor": { borderLeftColor: "#545464" },
     }),
   ];
 }
 
 function darkExtensions() {
   return [
-    syntaxHighlighting(monokaiHighlight),
+    syntaxHighlighting(kanagawaWaveHighlight),
     EditorView.theme(
       {
-        "&": { backgroundColor: "#272822", color: "#f8f8f2" },
-        ".cm-gutters": { backgroundColor: "#1e1f1c", color: "#75715e", border: "none" },
-        ".cm-activeLine": { backgroundColor: "#3e3d32" },
-        ".cm-selectionBackground, ::selection": { backgroundColor: "#49483e" },
-        ".cm-cursor": { borderLeftColor: "#f8f8f2" },
+        "&": { backgroundColor: "#1F1F28", color: "#DCD7BA" },
+        ".cm-gutters": { backgroundColor: "#16161D", color: "#727169", border: "none" },
+        ".cm-activeLine": { backgroundColor: "#2A2A37" },
+        ".cm-selectionBackground, ::selection": { backgroundColor: "#2D4F67" },
+        ".cm-cursor": { borderLeftColor: "#DCD7BA" },
       },
       { dark: true }
     ),
