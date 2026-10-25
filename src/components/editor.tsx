@@ -1,5 +1,5 @@
 import { useEffect, useRef } from "react";
-import { EditorState } from "@codemirror/state";
+import { EditorState, Compartment } from "@codemirror/state";
 import {
   EditorView,
   keymap,
@@ -20,6 +20,8 @@ import {
   foldGutter,
   foldKeymap,
 } from "@codemirror/language";
+import { tags } from "@lezer/highlight";
+import { HighlightStyle } from "@codemirror/language";
 import { autocompletion, completionKeymap, closeBrackets, closeBracketsKeymap } from "@codemirror/autocomplete";
 import { linter, lintGutter, setDiagnostics } from "@codemirror/lint";
 import { search, searchKeymap, highlightSelectionMatches } from "@codemirror/search";
@@ -53,145 +55,86 @@ const latexLanguage = StreamLanguage.define({
 
 // Common LaTeX / TikZ commands offered via autocomplete.
 const LATEX_COMMANDS = [
-  "\\documentclass",
-  "\\usepackage",
-  "\\begin",
-  "\\end",
-  "\\section",
-  "\\subsection",
-  "\\title",
-  "\\author",
-  "\\date",
-  "\\maketitle",
-  "\\textbf",
-  "\\textit",
-  "\\emph",
-  "\\frac",
-  "\\sqrt",
-  "\\sum",
-  "\\int",
-  "\\alpha",
-  "\\beta",
-  "\\gamma",
-  "\\delta",
-  "\\epsilon",
-  "\\theta",
-  "\\lambda",
-  "\\mu",
-  "\\pi",
-  "\\sigma",
-  "\\phi",
-  "\\omega",
-  "\\infty",
-  "\\cdot",
-  "\\times",
-  "\\div",
-  "\\pm",
-  "\\leq",
-  "\\geq",
-  "\\neq",
-  "\\approx",
-  "\\equiv",
-  "\\subset",
-  "\\supset",
-  "\\cup",
-  "\\cap",
-  "\\in",
-  "\\notin",
-  "\\forall",
-  "\\exists",
-  "\\rightarrow",
-  "\\leftarrow",
-  "\\Rightarrow",
-  "\\Leftarrow",
-  "\\leftrightarrow",
-  "\\mapsto",
-  "\\partial",
-  "\\nabla",
-  "\\ell",
-  "\\hbar",
-  "\\vec",
-  "\\hat",
-  "\\bar",
-  "\\tilde",
-  "\\dot",
-  "\\ddot",
-  "\\overline",
-  "\\underline",
-  "\\text",
-  "\\mathrm",
-  "\\mathbf",
-  "\\mathit",
-  "\\mathcal",
-  "\\mathbb",
-  "\\left",
-  "\\right",
-  "\\big",
-  "\\Big",
-  "\\bigg",
-  "\\Bigg",
-  "\\label",
-  "\\ref",
-  "\\cite",
-  "\\footnote",
-  "\\marginpar",
-  "\\newline",
-  "\\noindent",
-  "\\indent",
-  "\\vspace",
-  "\\hspace",
-  "\\hfill",
-  "\\vfill",
-  "\\newpage",
-  "\\clearpage",
-  "\\pagebreak",
-  "\\linebreak",
-  "\\par",
-  "\\centering",
-  "\\raggedright",
-  "\\raggedleft",
-  "\\flushleft",
-  "\\flushright",
-  "\\begin{document}",
-  "\\begin{figure}",
-  "\\begin{table}",
-  "\\begin{equation}",
-  "\\begin{align}",
-  "\\begin{itemize}",
-  "\\begin{enumerate}",
-  "\\begin{description}",
-  "\\begin{tabular}",
-  "\\begin{array}",
-  "\\begin{matrix}",
-  "\\begin{tikzpicture}",
-  "\\draw",
-  "\\node",
-  "\\path",
-  "\\fill",
-  "\\shade",
-  "\\clip",
-  "\\coordinate",
-  "\\foreach",
-  "\\pgfmathsetmacro",
-  "\\tikzset",
-  "\\tikzstyle",
-  "\\usetikzlibrary",
-  "\\definecolor",
-  "\\color",
-  "\\textcolor",
-  "\\colorbox",
-  "\\fcolorbox",
+  "\\documentclass", "\\usepackage", "\\begin", "\\end", "\\section", "\\subsection",
+  "\\title", "\\author", "\\date", "\\maketitle", "\\textbf", "\\textit", "\\emph",
+  "\\frac", "\\sqrt", "\\sum", "\\int", "\\alpha", "\\beta", "\\gamma", "\\delta",
+  "\\epsilon", "\\theta", "\\lambda", "\\mu", "\\pi", "\\sigma", "\\phi", "\\omega",
+  "\\infty", "\\cdot", "\\times", "\\div", "\\pm", "\\leq", "\\geq", "\\neq",
+  "\\approx", "\\equiv", "\\subset", "\\supset", "\\cup", "\\cap", "\\in", "\\notin",
+  "\\forall", "\\exists", "\\rightarrow", "\\leftarrow", "\\Rightarrow", "\\Leftarrow",
+  "\\leftrightarrow", "\\mapsto", "\\partial", "\\nabla", "\\ell", "\\hbar", "\\vec",
+  "\\hat", "\\bar", "\\tilde", "\\dot", "\\ddot", "\\overline", "\\underline",
+  "\\text", "\\mathrm", "\\mathbf", "\\mathit", "\\mathcal", "\\mathbb", "\\left",
+  "\\right", "\\big", "\\Big", "\\bigg", "\\Bigg", "\\label", "\\ref", "\\cite",
+  "\\footnote", "\\newline", "\\noindent", "\\indent", "\\vspace", "\\hspace",
+  "\\hfill", "\\vfill", "\\newpage", "\\clearpage", "\\pagebreak", "\\linebreak",
+  "\\par", "\\centering", "\\raggedright", "\\raggedleft", "\\begin{document}",
+  "\\begin{figure}", "\\begin{table}", "\\begin{equation}", "\\begin{align}",
+  "\\begin{itemize}", "\\begin{enumerate}", "\\begin{description}", "\\begin{tabular}",
+  "\\begin{array}", "\\begin{matrix}", "\\begin{tikzpicture}", "\\draw", "\\node",
+  "\\path", "\\fill", "\\shade", "\\clip", "\\coordinate", "\\foreach",
+  "\\pgfmathsetmacro", "\\tikzset", "\\tikzstyle", "\\usetikzlibrary",
+  "\\definecolor", "\\color", "\\textcolor", "\\colorbox", "\\fcolorbox",
 ];
 
+// Monokai highlight style (dark).
+const monokaiHighlight = HighlightStyle.define([
+  { tag: tags.comment, color: "#75715e", fontStyle: "italic" },
+  { tag: tags.keyword, color: "#f92672" },
+  { tag: tags.string, color: "#e6db74" },
+  { tag: tags.number, color: "#ae81ff" },
+  { tag: tags.punctuation, color: "#f8f8f2" },
+  { tag: tags.bracket, color: "#f8f8f2" },
+  { tag: tags.variableName, color: "#f8f8f2" },
+  { tag: tags.operator, color: "#f92672" },
+  { tag: tags.typeName, color: "#a6e22e" },
+  { tag: tags.name, color: "#66d9ef" },
+  { tag: tags.number, color: "#ae81ff" },
+  { tag: tags.propertyName, color: "#a6e22e" },
+  { tag: tags.className, color: "#a6e22e", fontStyle: "italic" },
+  { tag: tags.tagName, color: "#f92672" },
+  { tag: tags.attributeName, color: "#a6e22e" },
+  { tag: tags.attributeValue, color: "#e6db74" },
+]);
+
 const noOpLinter = linter(() => []);
+
+const themeCompartment = new Compartment();
+
+function lightExtensions() {
+  return [
+    syntaxHighlighting(defaultHighlightStyle, { fallback: true }),
+    EditorView.theme({
+      "&": { backgroundColor: "#ffffff", color: "#1f2937" },
+      ".cm-gutters": { backgroundColor: "#f3f4f6", color: "#6b7280", border: "none" },
+    }),
+  ];
+}
+
+function darkExtensions() {
+  return [
+    syntaxHighlighting(monokaiHighlight),
+    EditorView.theme(
+      {
+        "&": { backgroundColor: "#272822", color: "#f8f8f2" },
+        ".cm-gutters": { backgroundColor: "#1e1f1c", color: "#75715e", border: "none" },
+        ".cm-activeLine": { backgroundColor: "#3e3d32" },
+        ".cm-selectionBackground, ::selection": { backgroundColor: "#49483e" },
+        ".cm-cursor": { borderLeftColor: "#f8f8f2" },
+      },
+      { dark: true }
+    ),
+  ];
+}
 
 interface EditorProps {
   value: string;
   onChange: (value: string) => void;
   errors?: { line: number; message: string }[];
+  dark?: boolean;
 }
 
-export function Editor({ value, onChange, errors }: EditorProps) {
+export function Editor({ value, onChange, errors, dark }: EditorProps) {
   const editorRef = useRef<HTMLDivElement>(null);
   const viewRef = useRef<EditorView | null>(null);
 
@@ -208,7 +151,6 @@ export function Editor({ value, onChange, errors }: EditorProps) {
         indentOnInput(),
         bracketMatching(),
         closeBrackets(),
-        syntaxHighlighting(defaultHighlightStyle, { fallback: true }),
         latexLanguage,
         autocompletion({
           override: [
@@ -235,6 +177,7 @@ export function Editor({ value, onChange, errors }: EditorProps) {
           ...completionKeymap,
           indentWithTab,
         ]),
+        themeCompartment.of(dark ? darkExtensions() : lightExtensions()),
         EditorView.updateListener.of((update) => {
           if (update.docChanged) {
             onChange(update.state.doc.toString());
@@ -273,6 +216,15 @@ export function Editor({ value, onChange, errors }: EditorProps) {
       });
     }
   }, [value]);
+
+  // Reconfigure theme when dark mode changes.
+  useEffect(() => {
+    const view = viewRef.current;
+    if (!view) return;
+    view.dispatch({
+      effects: themeCompartment.reconfigure(dark ? darkExtensions() : lightExtensions()),
+    });
+  }, [dark]);
 
   // Push compilation errors into the lint system when they change.
   useEffect(() => {

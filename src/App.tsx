@@ -438,7 +438,7 @@ function App() {
             <ResizablePanelGroup direction="horizontal" className="flex-1">
               <ResizablePanel defaultSize={50} minSize={20}>
                 <div className="h-full min-h-0 overflow-auto">
-                  <Editor value={content} onChange={handleEditorChange} errors={compilationErrors.map((e) => ({ line: e.line, message: e.message }))} />
+                  <Editor value={content} onChange={handleEditorChange} errors={compilationErrors.map((e) => ({ line: e.line, message: e.message }))} dark={isDark} />
                 </div>
               </ResizablePanel>
               <ResizableHandle withHandle />
@@ -451,7 +451,7 @@ function App() {
           </TabsContent>
           <TabsContent value="editor" className="min-h-0 flex-1">
             <div className="h-full min-h-0 overflow-auto px-1">
-              <Editor value={content} onChange={handleEditorChange} errors={compilationErrors.map((e) => ({ line: e.line, message: e.message }))} />
+              <Editor value={content} onChange={handleEditorChange} errors={compilationErrors.map((e) => ({ line: e.line, message: e.message }))} dark={isDark} />
             </div>
           </TabsContent>
           <TabsContent value="preview" className="min-h-0 flex-1">
