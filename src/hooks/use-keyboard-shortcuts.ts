@@ -3,9 +3,10 @@ import { useEffect } from "react";
 interface ShortcutHandlers {
   onOpen?: () => void;
   onSave?: () => void;
+  onCompile?: () => void;
 }
 
-export function useKeyboardShortcuts({ onOpen, onSave }: ShortcutHandlers) {
+export function useKeyboardShortcuts({ onOpen, onSave, onCompile }: ShortcutHandlers) {
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if (!e.ctrlKey && !e.metaKey) return;
@@ -17,10 +18,13 @@ export function useKeyboardShortcuts({ onOpen, onSave }: ShortcutHandlers) {
       } else if (key === "o") {
         e.preventDefault();
         onOpen?.();
+      } else if (key === "enter") {
+        e.preventDefault();
+        onCompile?.();
       }
     };
 
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
-  }, [onOpen, onSave]);
+  }, [onOpen, onSave, onCompile]);
 }

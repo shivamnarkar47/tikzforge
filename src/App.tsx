@@ -119,7 +119,11 @@ function App() {
     if (isDirty) markSaved();
   }, [isDirty, markSaved]);
 
-  useKeyboardShortcuts({ onOpen: handleOpen, onSave: handleSave });
+  const handleCompile = useCallback(() => {
+    void compile(filename, content);
+  }, [compile, filename, content]);
+
+  useKeyboardShortcuts({ onOpen: handleOpen, onSave: handleSave, onCompile: handleCompile });
 
   useAutoSave({ onSave: handleAutoSave, intervalMs: 30000 });
 
