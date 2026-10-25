@@ -1,6 +1,7 @@
 import { useLatexEngineStore } from "../store/latex-engine-store";
-import { Button } from "./ui/button";
-import { AlertCircle } from "lucide-react";
+import { Button } from "./motion/button/base";
+import { Card, CardContent, CardHeader } from "./motion/card";
+import { Alert, AlertDescription, AlertTitle } from "./motion/alert";
 
 interface FirstLaunchGateProps {
   children: React.ReactNode;
@@ -23,22 +24,27 @@ export function FirstLaunchGate({ children }: FirstLaunchGateProps) {
   // render the error card if we're stuck there or in "error".
   return (
     <div className="flex h-full w-full items-center justify-center bg-background p-6">
-      <div className="flex max-w-md flex-col items-center gap-4 rounded-lg border bg-card p-8 text-center shadow-sm">
-        <AlertCircle className="size-8 text-destructive" />
-        <h2 className="text-lg font-semibold">LaTeX not found</h2>
-        <p className="text-sm text-muted-foreground">
-          {error ??
-            "TikzForge could not find its bundled Tectonic engine. Please reinstall the app."}
-        </p>
-        {pdflatexPath && (
-          <p className="font-mono text-xs text-muted-foreground">
-            Expected at: {pdflatexPath}
-          </p>
-        )}
-        <Button variant="outline" size="sm" onClick={() => window.location.reload()}>
-          Retry
-        </Button>
-      </div>
+      <Card className="max-w-md text-center">
+        <CardHeader>
+          <Alert variant="destructive">
+            <AlertTitle>LaTeX not found</AlertTitle>
+            <AlertDescription>
+              {error ??
+                "TikzForge could not find its bundled Tectonic engine. Please reinstall the app."}
+            </AlertDescription>
+          </Alert>
+        </CardHeader>
+        <CardContent className="flex flex-col items-center gap-4">
+          {pdflatexPath && (
+            <p className="font-mono text-xs text-muted-foreground">
+              Expected at: {pdflatexPath}
+            </p>
+          )}
+          <Button variant="outline" size="sm" onClick={() => window.location.reload()}>
+            Retry
+          </Button>
+        </CardContent>
+      </Card>
     </div>
   );
 }

@@ -13,7 +13,17 @@ Object.defineProperty(window, "matchMedia", {
   })),
 });
 
-// Mock react-resizable-panels — doesn't work in jsdom
+// Mock ResizeObserver — not available in jsdom (used by beUI tabs)
+class ResizeObserverMock {
+  observe() {}
+  unobserve() {}
+  disconnect() {}
+}
+Object.defineProperty(window, "ResizeObserver", {
+  writable: true,
+  value: ResizeObserverMock,
+});
+(globalThis as any).ResizeObserver = ResizeObserverMock;
 vi.mock("react-resizable-panels", () => {
   const createMock = (defaultClassName?: string) =>
     ({ children, className, ...rest }: React.HTMLAttributes<HTMLDivElement> & { [key: string]: any }) => {

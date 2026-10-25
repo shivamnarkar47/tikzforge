@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useDocumentStore } from "../store/document-store";
-import { Button } from "./ui/button";
+import { Button } from "./motion/button/base";
 import { Loader2, Play } from "lucide-react";
 
 interface CompileButtonProps {
