@@ -11,7 +11,7 @@ path = "src/main.rs"
 [dependencies]
 tikzforge-core = { path = "../tikzforge-core" }
 gpui = "0.2.2"
-rfd = "0.16"
+rfd = { version = "0.16", default-features = false, features = ["gtk3"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 dirs = "5"
@@ -22,3 +22,5 @@ pdfium-bundled = "0.2.0"
 pdfium-render = "0.9"
 image = "0.25.10"
 smallvec = "1"
+ureq = "3"
+tokio = { version = "1", features = ["sync"] }
