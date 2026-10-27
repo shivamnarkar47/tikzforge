@@ -25,7 +25,7 @@ set -euo pipefail
 TECTONIC_VERSION="0.17.0"
 TECTONIC_BASE="https://github.com/tectonic-typesetting/tectonic/releases/download/tectonic%40${TECTONIC_VERSION}"
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-STAGE_DIR="$REPO_ROOT/src-tauri/tectonic"
+STAGE_DIR="$REPO_ROOT/legacy/src-tauri/tectonic"
 
 log() { echo "[prepare-engine] $*"; }
 

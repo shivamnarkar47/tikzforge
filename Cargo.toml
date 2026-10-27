@@ -2,10 +2,10 @@
 resolver = "2"
 members = [
     "tikzforge-core",
-    "src-tauri",
+    "legacy/src-tauri",
     "tikzforge-gpui",
 ]
-default-members = ["src-tauri"]
+default-members = ["tikzforge-gpui"]
 
 [patch.crates-io]
 xattr = { path = "patches/xattr-0.2.3" }

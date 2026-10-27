@@ -50,6 +50,12 @@ pub fn dev_staged_candidates(
         dir = d.parent();
     }
     out.push(cwd.join("src-tauri").join("tectonic").join(exe_name));
+    out.push(
+        cwd.join("legacy")
+            .join("src-tauri")
+            .join("tectonic")
+            .join(exe_name),
+    );
     out.push(cwd.join("tectonic").join(exe_name));
     out
 }

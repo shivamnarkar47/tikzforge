@@ -7,9 +7,14 @@ Last updated: 2026-10-28
 ## Current phase and status
 
 - **Phase 0 — Baseline capture**: COMPLETE
-- **Phase 1 — Backend parity (extract Rust backend into `tikzforge-core`)**: COMPLETE
-- **Phase 2 — (next)**: NOT STARTED
-- Overall migration status: Phase 1 complete; `tikzforge-core` workspace crate extracted. Tauri app remains the shipping implementation on `master` / `archive/tauri-react-0.2.1`. No GPUI UI code yet.
+- **Phase 1 — Backend parity**: COMPLETE
+- **Phase 2 — GPUI shell**: COMPLETE
+- **Phase 3 — Editor port**: COMPLETE
+- **Phase 4 — PDF viewer**: COMPLETE
+- **Phase 5 — Feature parity**: COMPLETE
+- **Phase 6 — Testing & hardening**: COMPLETE
+- **Phase 7 — Cutover**: COMPLETE
+- Overall migration status: COMPLETE. GPUI is the shipped stack; Tauri + React archived under `legacy/`.
 
 ## Completed tasks
 
@@ -51,7 +56,7 @@ Tags are annotated? No — lightweight tags pointing at commit SHAs. Create with
 
 ## Blockers
 
-- None blocking. Phase 2 (GPUI shell) not started; `tikzforge-gpui` crate does not exist yet.
+- None. Migration complete.
 
 ## Notes
 

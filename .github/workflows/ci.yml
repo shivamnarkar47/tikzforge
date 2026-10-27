@@ -22,7 +22,7 @@ jobs:
         with:
           workspaces: |
             .
-            src-tauri
+            legacy/src-tauri
 
       - name: Install system dependencies (Linux)
         run: |
@@ -50,20 +50,4 @@ jobs:
             echo "Workspace or tikzforge-gpui crate not present yet; skipping"
           fi
 
-  frontend:
-    name: Frontend (Tauri app)
-    runs-on: ubuntu-latest
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: oven-sh/setup-bun@v1
-
-      - name: Install frontend dependencies
-        run: bun install --frozen-lockfile
-
-      - name: Type check
-        run: bunx tsc --noEmit
-
-      - name: Tests
-        run: bunx vitest run
+  # Frontend (Tauri/React) tests archived under legacy/; no longer run in CI.

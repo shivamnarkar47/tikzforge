@@ -1,32 +1,36 @@
-name: Release GPUI (draft)
+name: Release GPUI
 
-# Disabled by default: manual trigger only until the GPUI binary is ready.
 on:
-  workflow_dispatch:
+  push:
+    tags:
+      - "v*"
 
 permissions:
   contents: write
 
 jobs:
   release-gpui:
-    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        platform: [ubuntu-latest, windows-latest]
+
+    runs-on: ${{ matrix.platform }}
 
     steps:
       - uses: actions/checkout@v4
 
       - uses: dtolnay/rust-toolchain@stable
 
-      - uses: dtolnay/rust-toolchain@nightly
-
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: .
 
-      - name: Install system dependencies (Linux)
+      - name: Install system dependencies (Ubuntu)
+        if: matrix.platform == 'ubuntu-latest'
         run: |
           sudo apt-get update
           sudo apt-get install -y \
-            libgtk-3-dev libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev \
             libfontconfig1-dev libgraphite2-dev libharfbuzz-dev libicu-dev \
             libpng-dev libssl-dev pkg-config zlib1g-dev patchelf \
             libxkbcommon-dev libwayland-dev libvulkan-dev clang
@@ -34,8 +38,32 @@ jobs:
       - name: Build GPUI binary
         run: cargo build -p tikzforge-gpui --release
 
-      - name: Upload artifact
+      - name: Upload artifact (Linux)
+        if: matrix.platform == 'ubuntu-latest'
         uses: actions/upload-artifact@v4
         with:
           name: tikzforge-gpui-linux
           path: target/release/tikzforge-gpui
+
+      - name: Upload artifact (Windows)
+        if: matrix.platform == 'windows-latest'
+        uses: actions/upload-artifact@v4
+        with:
+          name: tikzforge-gpui-windows
+          path: target/release/tikzforge-gpui.exe
+
+      - name: Create Release (Linux)
+        if: matrix.platform == 'ubuntu-latest'
+        uses: softprops/action-gh-release@v2
+        with:
+          files: target/release/tikzforge-gpui
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Add Windows asset to Release
+        if: matrix.platform == 'windows-latest'
+        uses: softprops/action-gh-release@v2
+        with:
+          files: target/release/tikzforge-gpui.exe
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

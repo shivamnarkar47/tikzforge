@@ -16,8 +16,8 @@
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-TECTONIC_DIR="$REPO_ROOT/src-tauri/tectonic"
-CONF="$REPO_ROOT/src-tauri/tauri.conf.json"
+TECTONIC_DIR="$REPO_ROOT/legacy/src-tauri/tectonic"
+CONF="$REPO_ROOT/legacy/src-tauri/tauri.conf.json"
 
 if [[ ! -f "$TECTONIC_DIR/tectonic" && ! -f "$TECTONIC_DIR/tectonic.exe" ]]; then
   echo "[generate-tauri-config] Error: no staged Tectonic binary found in $TECTONIC_DIR."

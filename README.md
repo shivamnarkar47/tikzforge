@@ -38,20 +38,20 @@ Later:
 
 ## Tech Stack
 
-- **Frontend**: React 19 + TypeScript + Vite
-- **Backend**: Tauri v2 (Rust)
-- **Editor**: CodeMirror 6 with custom LaTeX highlighting
-- **State**: Zustand
-- **Styling**: Tailwind CSS v4 + shadcn/ui components
-- **Testing**: Vitest + React Testing Library
+- **UI**: GPUI (Rust-native, GPU-accelerated)
+- **Backend**: Rust (`tikzforge-core` + `tikzforge-gpui`)
+- **Editor**: Rust text buffer (ropey) + tree-sitter-latex
+- **PDF**: pdfium
+- **Testing**: cargo test
+
+The legacy Tauri + React implementation is archived under `legacy/` for one release cycle.
 
 ## Getting Started
 
 ### Prerequisites
 
-- [Bun](https://bun.sh/) (package manager)
-- [Rust](https://www.rust-lang.org/tools/install) (for Tauri)
-- [Tauri CLI](https://v2.tauri.app/start/prerequisites/) platform dependencies
+- [Rust](https://www.rust-lang.org/tools/install) (stable)
+- Platform dependencies for GPUI (Linux: gtk/wayland/vulkan dev packages; see CI)
 
 ### Installation
 
@@ -59,87 +59,61 @@ Later:
 # Clone the repo
 git clone https://github.com/shivamnarkar47/tikzforge.git
 cd tikzforge
-
-# Install dependencies
-bun install
 ```
 
 ### Development
 
 ```bash
-# Start dev server with hot reload
-bun run tauri dev
+# Build and run the GPUI app
+cargo run -p tikzforge-gpui
 ```
 
 ### Testing
 
 ```bash
-# Run all tests
-bunx vitest run
+# Run all Rust tests
+cargo test --workspace
 
-# Run single test file
-bunx vitest run src/path/to/test.test.ts
+# Run GPUI tests only
+cargo test -p tikzforge-gpui
 
 # Type check
-bunx tsc --noEmit
+cargo check --workspace
 ```
 
 ### Building
 
 ```bash
 # Build for production
-bun run tauri build
+cargo build -p tikzforge-gpui --release
 ```
 
 Outputs:
-- Linux: `.AppImage` and `.deb` packages
-- Windows: `.exe` NSIS installer
+- Binary: `target/release/tikzforge-gpui` (or `.exe` on Windows)
+
+### Legacy (Tauri) build
+
+The archived Tauri + React implementation lives under `legacy/`. To build it:
+
+```bash
+cd legacy/src-tauri
+cargo tauri build
+```
 
 ## Project Structure
 
 ```
-src/
-├── components/     # React UI components
-│   ├── editor.tsx       # CodeMirror editor
-│   ├── pdf-viewer.tsx   # PDF preview
-│   ├── error-list.tsx   # Compilation errors
-│   └── compile-button.tsx
-├── hooks/          # React hooks
-│   ├── use-compile.ts
-│   ├── use-auto-compile.ts
-│   ├── use-keyboard-shortcuts.ts
-│   ├── use-system-theme.ts
-│   ├── use-synctex.ts
-│   ├── use-tab-close-guard.ts
-│   └── use-updater.ts
-├── lib/            # Pure functions and Tauri wrappers
-│   ├── compilation.ts
-│   ├── compilation-parser.ts
-│   ├── synctex-parser.ts
-│   ├── latex-engine.ts
-│   ├── updater.ts
-│   └── persistence.ts
-├── store/          # Zustand stores
-│   ├── document-store.ts
-│   ├── tab-store.ts
-│   ├── theme-store.ts
-│   └── latex-engine-store.ts
-└── test/           # Test setup
-    └── setup.tsx
+tikzforge-core/     # Pure Rust backend (compile, engine, synctex, persistence)
+tikzforge-gpui/     # GPUI app (UI, editor, PDF viewer)
+legacy/             # Archived Tauri + React app (one release cycle)
 ```
 
 ## Architecture
 
-TikzForge uses a Tauri v2 architecture:
+TikzForge is a native Rust application built on GPUI:
 
-1. **Frontend** (React) handles UI, state, and user interactions
-2. **Backend** (Rust/Tauri) handles:
-   - Process management (pdflatex invocation)
-   - File system operations
-   - Update checks
-   - SyncTeX parsing
-
-Communication between frontend and backend uses Tauri's `invoke` API with typed TypeScript interfaces.
+1. **Core** (`tikzforge-core`) handles compile pipeline, engine detection, SyncTeX, persistence.
+2. **UI** (`tikzforge-gpui`) handles rendering, editing, PDF preview, theming.
 
 ## License
 

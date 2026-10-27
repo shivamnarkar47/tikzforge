@@ -2,7 +2,7 @@
 
 **Start date:** 2026-10-26 (Phase 0 baseline capture)
 **Branch:** `gpui-migration` (working branch)
-**Status:** In progress — Phase 1 complete; Phase 2 (GPUI shell) not started.
+**Status:** Complete — all phases (0–7) finished; GPUI is the shipped stack.
 **Owner:** Orchestrator + sub-agents (state-maintainer, documentation, …)
 
 ## Branch strategy
@@ -18,12 +18,13 @@
 | Phase | Name | Status | Start | End | Notes |
 |-------|------|--------|-------|-----|-------|
 | 0 | Baseline capture | Complete | 2026-10-26 | 2026-10-28 | Tauri app intact; branch + tags + state docs. Commit `3a34d06`. Tag `gpui-phase0-complete`. |
-| 1 | Backend parity (extract Rust backend into `tikzforge-core`) | Complete | 2026-10-28 | 2026-10-28 | Pure Rust crate `tikzforge-core` (compile, engine detection, synctex). Workspace root `Cargo.toml`. Commit `5336d50`. CI workflow `edad2f0`. |
-| 2 | GPUI shell prototype | Not started | — | — | Build minimal GPUI window (toolbar + text area); validate rendering/input. Planned crate `tikzforge-gpui`. |
-| 3 | Editor port | Not started | — | — | LaTeX highlighting + basic editing in GPUI (or embed Rust editor crate). |
-| 4 | PDF viewer | Not started | — | — | Rust PDF renderer + SyncTeX mapping. |
-| 5 | Feature parity | Not started | — | — | Tabs, theming, persistence, updater, dialogs. |
-| 6 | Cutover | Not started | — | — | Replace Tauri frontend entirely; retire webview. |
+| 1 | Backend parity (extract Rust backend into `tikzforge-core`) | Complete | 2026-10-28 | 2026-10-28 | Pure Rust crate `tikzforge-core`. Commit `5336d50`. |
+| 2 | GPUI shell | Complete | 2026-10-28 | 2026-10-28 | GPUI shell, theme, split pane, dialogs, persistence, shortcuts. Commit `4b16875`. |
+| 3 | Editor port | Complete | 2026-10-28 | 2026-10-28 | ropey buffer, tree-sitter-latex, highlighting, search, autocomplete, folding. Commit `9eecd15`. |
+| 4 | PDF viewer | Complete | 2026-10-28 | 2026-10-28 | pdfium rendering + SyncTeX. |
+| 5 | Feature parity | Complete | 2026-10-28 | 2026-10-28 | Tabs, palette, toasts, auto-compile, engine gate, recent files, errors, updater, persistence. Commit `b17c924`. |
+| 6 | Testing & hardening | Complete | 2026-10-28 | 2026-10-28 | Rust tests. Commit `1f08052`. |
+| 7 | Cutover | Complete | 2026-10-28 | 2026-10-28 | GPUI shipped; Tauri archived under `legacy/`. |
 
 ## Decision log
 
