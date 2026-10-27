@@ -38,10 +38,14 @@ Last updated: 2026-10-28
 
 After each phase completes, the orchestrator (or state maintainer) creates a tag named `gpui-phaseN-complete` pointing at the phase's final commit:
 
-- `gpui-phase0-complete` → Phase 0 (baseline) ✅ created
-- `gpui-phase1-complete` → Phase 1 (complete; tag to be created by state-maintainer)
-- `gpui-phase2-complete` → Phase 2 (TBD)
-- `gpui-phaseN-complete` → Phase N
+- `gpui-phase0-complete` → Phase 0 ✅
+- `gpui-phase1-complete` → Phase 1 ✅
+- `gpui-phase2-complete` → Phase 2 ✅
+- `gpui-phase3-complete` → Phase 3 ✅
+- `gpui-phase4-complete` → Phase 4 ✅
+- `gpui-phase5-complete` → Phase 5 ✅
+- `gpui-phase6-complete` → Phase 6 ✅
+- `gpui-phase7-complete` → Phase 7 (cutover) ✅ created
 
 Tags are annotated? No — lightweight tags pointing at commit SHAs. Create with:
 `git tag gpui-phaseN-complete <commit-sha>` then `git push origin gpui-phaseN-complete`.
