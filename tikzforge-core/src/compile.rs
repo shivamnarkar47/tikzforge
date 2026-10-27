@@ -148,16 +148,9 @@ pub fn compile_tex(
         .map_err(|e| format!("Failed to run Tectonic: {e}"))?;
 
     let transcript = Arc::new(Mutex::new(String::new()));
-    let out_reader = spawn_log_streamer(
-        child.stdout.take(),
-        Arc::clone(&transcript),
-        log_tx.clone(),
-    );
-    let err_reader = spawn_log_streamer(
-        child.stderr.take(),
-        Arc::clone(&transcript),
-        log_tx,
-    );
+    let out_reader =
+        spawn_log_streamer(child.stdout.take(), Arc::clone(&transcript), log_tx.clone());
+    let err_reader = spawn_log_streamer(child.stderr.take(), Arc::clone(&transcript), log_tx);
 
     let outcome = run_with_timeout(&mut child, COMPILE_TIMEOUT, &COMPILE_GEN, my_gen)
         .map_err(|e| format!("Failed while running Tectonic: {e}"))?;
@@ -218,8 +211,11 @@ pub fn read_synctex(path: &str) -> Result<String, String> {
     let bytes = fs::read(path).map_err(|e| e.to_string())?;
     let mut decoder = GzDecoder::new(&bytes[..]);
     let mut content = String::new();
-    decoder
-        .read_to_string(&mut content)
-        .map_err(|e| format!("Failed to decompress {}: {e}", PathBuf::from(path).display()))?;
+    decoder.read_to_string(&mut content).map_err(|e| {
+        format!(
+            "Failed to decompress {}: {e}",
+            PathBuf::from(path).display()
+        )
+    })?;
     Ok(content)
 }

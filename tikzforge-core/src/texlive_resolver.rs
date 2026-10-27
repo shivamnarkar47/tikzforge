@@ -145,4 +145,3 @@ pub fn resolve_engine(resource_dir: Option<PathBuf>) -> Engine {
     let path = find_on_path(exe_name).unwrap_or_else(|| PathBuf::from(exe_name));
     Engine { path }
 }
-

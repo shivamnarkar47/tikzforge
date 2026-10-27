@@ -39,10 +39,8 @@ fn current_platform_is_linux_on_linux() {
 
 #[test]
 fn ensure_executable_sets_exec_bit() {
-    let path = std::env::temp_dir().join(format!(
-        "tikzforge-ensure-exec-test-{}",
-        std::process::id()
-    ));
+    let path =
+        std::env::temp_dir().join(format!("tikzforge-ensure-exec-test-{}", std::process::id()));
     std::fs::write(&path, "stub").unwrap();
     #[cfg(unix)]
     {

@@ -1,7 +1,7 @@
 use std::process::{Command, Stdio};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::{Duration, Instant};
-use tikzforge_core::compile::{run_with_timeout, RunOutcome};
+use tikzforge_core::compile::{RunOutcome, run_with_timeout};
 
 fn spawn(args: &[&str]) -> std::process::Child {
     Command::new(args[0])

@@ -18,7 +18,8 @@ async fn compile_tex(
         }
     });
 
-    let result = tikzforge_core::compile::compile_tex_async(path, content, resource_dir, Some(tx)).await;
+    let result =
+        tikzforge_core::compile::compile_tex_async(path, content, resource_dir, Some(tx)).await;
     let _ = forwarder.await;
     result
 }
