@@ -7,8 +7,9 @@ Last updated: 2026-10-28
 ## Current phase and status
 
 - **Phase 0 — Baseline capture**: COMPLETE
-- **Phase 1 — (next)**: NOT STARTED
-- Overall migration status: Phase 0 complete; no GPUI code yet. Tauri app remains the shipping implementation on `master` / `archive/tauri-react-0.2.1`.
+- **Phase 1 — Backend parity (extract Rust backend into `tikzforge-core`)**: COMPLETE
+- **Phase 2 — (next)**: NOT STARTED
+- Overall migration status: Phase 1 complete; `tikzforge-core` workspace crate extracted. Tauri app remains the shipping implementation on `master` / `archive/tauri-react-0.2.1`. No GPUI UI code yet.
 
 ## Completed tasks
 
@@ -16,6 +17,8 @@ Last updated: 2026-10-28
 |------|-----------|-------|
 | Baseline capture / branch setup (`gpui-migration`) | 3a34d066c1320bc29fa5fb824d5fa791b545380c | HEAD at tag time; Tauri app intact |
 | State maintainer setup (tags + docs) | (this commit) | Adds `docs/agent-state.md`, `docs/backtracking.md`, tag `gpui-phase0-complete` |
+| Phase 1 backend extraction | 5336d504b53307f8ac08ef1b2f7658d16ad89ee6 | Extracted `tikzforge-core` workspace crate; refactored `src-tauri`. |
+| CI workflow | edad2f0ec7602f144106b10d9757fa55fd232c07 | GitHub Actions CI for workspace + draft GPUI release. |
 
 ## Rollback points (tagged commits)
 
@@ -31,7 +34,7 @@ Last updated: 2026-10-28
 After each phase completes, the orchestrator (or state maintainer) creates a tag named `gpui-phaseN-complete` pointing at the phase's final commit:
 
 - `gpui-phase0-complete` → Phase 0 (baseline) ✅ created
-- `gpui-phase1-complete` → Phase 1 (TBD)
+- `gpui-phase1-complete` → Phase 1 (complete; tag to be created by state-maintainer)
 - `gpui-phase2-complete` → Phase 2 (TBD)
 - `gpui-phaseN-complete` → Phase N
 
@@ -48,7 +51,7 @@ Tags are annotated? No — lightweight tags pointing at commit SHAs. Create with
 
 ## Blockers
 
-- None recorded. Migration has not yet begun; Phase 1 scope TBD.
+- None blocking. Phase 2 (GPUI shell) not started; `tikzforge-gpui` crate does not exist yet.
 
 ## Notes
 
