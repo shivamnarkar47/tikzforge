@@ -3,7 +3,7 @@ use codebook_tree_sitter_latex as ts_latex;
 use gpui::prelude::FluentBuilder;
 use gpui::*;
 use ropey::{LineType, Rope};
-use std::collections::{HashMap, HashSet};
+use std::collections::HashSet;
 use tree_sitter::Parser;
 
 #[derive(Clone, Debug)]
@@ -83,6 +83,7 @@ impl Editor {
         cx.notify();
     }
 
+    #[allow(dead_code)]
     pub fn set_text(&mut self, text: String, cx: &mut Context<Self>) {
         self.rope = Rope::from_str(&text);
         self.cursor = 0;
@@ -98,6 +99,7 @@ impl Editor {
         cx.notify();
     }
 
+    #[allow(dead_code)]
     pub fn set_diagnostics(&mut self, diags: Vec<Diagnostic>, cx: &mut Context<Self>) {
         self.diagnostics = diags;
         cx.notify();
@@ -578,12 +580,11 @@ impl Editor {
             let t = l.trim();
             if t.starts_with("\\begin{") {
                 stack.push(i);
-            } else if t.starts_with("\\end{") {
-                if let Some(start) = stack.pop() {
-                    if i > start + 1 {
-                        ranges.push((start, i));
-                    }
-                }
+            } else if t.starts_with("\\end{")
+                && let Some(start) = stack.pop()
+                && i > start + 1
+            {
+                ranges.push((start, i));
             }
         }
         self.fold_ranges = ranges;
@@ -698,12 +699,12 @@ impl Editor {
                     cx.notify();
                     return;
                 }
-                if let Some(ch) = &ks.key_char {
-                    if ch.chars().count() == 1 {
-                        self.search_query.push_str(ch);
-                        cx.notify();
-                        return;
-                    }
+                if let Some(ch) = &ks.key_char
+                    && ch.chars().count() == 1
+                {
+                    self.search_query.push_str(ch);
+                    cx.notify();
+                    return;
                 }
             }
         }
@@ -724,12 +725,12 @@ impl Editor {
                     cx.notify();
                     return;
                 }
-                if let Some(ch) = &ks.key_char {
-                    if ch.chars().count() == 1 {
-                        self.replace_text.push_str(ch);
-                        cx.notify();
-                        return;
-                    }
+                if let Some(ch) = &ks.key_char
+                    && ch.chars().count() == 1
+                {
+                    self.replace_text.push_str(ch);
+                    cx.notify();
+                    return;
                 }
             }
         }
@@ -832,20 +833,20 @@ impl Editor {
         }
 
         if !ctrl && !alt {
-            if let Some(ch) = &ks.key_char {
-                if !ch.is_empty() {
-                    self.insert_text(ch, cx);
-                    return;
-                }
+            if let Some(ch) = &ks.key_char
+                && !ch.is_empty()
+            {
+                self.insert_text(ch, cx);
+                return;
             }
             if ks.key == "space" {
                 self.insert_text(" ", cx);
-                return;
             }
         }
     }
 }
 
+#[allow(dead_code)]
 pub struct Colors {
     pub bg: u32,
     pub fg: u32,
@@ -869,7 +870,7 @@ impl Focusable for Editor {
 }
 
 impl Render for Editor {
-    fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+    fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         self.update_bracket_highlights();
         if self.fold_ranges.is_empty() {
             self.update_folds();
@@ -1248,6 +1249,42 @@ impl Render for Editor {
             );
         }
         container
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::Editor;
+    use crate::commands;
+    use gpui::AppContext;
+
+    #[test]
+    fn editor_buffer_round_trips() {
+        let mut cx = gpui::TestAppContext::single();
+        let ed = cx.new(|cx| Editor::new(cx, "hello".to_string(), true));
+        cx.update(|app| {
+            assert_eq!(ed.read(app).text(), "hello");
+        });
+
+        cx.update(|app| {
+            ed.update(app, |e, cx| e.set_text("replaced".to_string(), cx));
+        });
+        cx.update(|app| {
+            assert_eq!(ed.read(app).text(), "replaced");
+        });
+
+        cx.update(|app| {
+            ed.update(app, |e, cx| e.insert_text("X", cx));
+        });
+        cx.update(|app| {
+            assert_eq!(ed.read(app).text(), "Xreplaced");
+        });
+    }
+
+    #[test]
+    fn filter_commands_works() {
+        let items = commands::filter_commands("\\dr");
+        assert!(items.contains(&"\\draw"));
     }
 }
 

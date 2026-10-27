@@ -1,3 +1,4 @@
+#![recursion_limit = "512"]
 mod commands;
 mod editor;
 
@@ -12,8 +13,7 @@ use smallvec::smallvec;
 use std::fs;
 use std::path::PathBuf;
 use std::sync::Arc;
-use std::time::{Duration, Instant};
-use tikzforge_core;
+use std::time::Duration;
 
 // ---------- Synctex ----------
 
@@ -44,15 +44,15 @@ fn parse_synctex(content: &str) -> Vec<SynctexRecord> {
             continue;
         }
         let parts: Vec<&str> = trimmed.split_whitespace().collect();
-        if parts.len() >= 5 {
-            if let (Ok(page), Ok(x), Ok(y), Ok(line)) = (
+        if parts.len() >= 5
+            && let (Ok(page), Ok(x), Ok(y), Ok(line)) = (
                 parts[0].parse::<i32>(),
                 parts[1].parse::<i32>(),
                 parts[2].parse::<i32>(),
                 parts[3].parse::<i32>(),
-            ) {
-                records.push(SynctexRecord { page, x, y, line });
-            }
+            )
+        {
+            records.push(SynctexRecord { page, x, y, line });
         }
     }
     records
@@ -416,6 +416,7 @@ impl TikzForgeApp {
         &self.docs[self.active]
     }
 
+    #[allow(dead_code)]
     fn active_doc_mut(&mut self) -> &mut Document {
         &mut self.docs[self.active]
     }
@@ -428,7 +429,7 @@ impl TikzForgeApp {
         let my_gen = self.auto_compile_gen;
         let (path, content) = self.current_path_content(cx);
         let this = cx.weak_entity();
-        gpui::App::spawn(&*cx, async move |mut cx| {
+        gpui::App::spawn(&*cx, async move |cx| {
             Timer::after(Duration::from_secs(2)).await;
             let still = cx
                 .update(|app| {
@@ -454,7 +455,7 @@ impl TikzForgeApp {
         .detach();
     }
 
-    fn current_path_content(&self, cx: &mut Context<Self>) -> (String, String) {
+    fn current_path_content(&self, _cx: &mut Context<Self>) -> (String, String) {
         // sync not needed; use stored content
         let doc = &self.docs[self.active];
         let path = doc
@@ -483,7 +484,7 @@ impl TikzForgeApp {
             tikzforge_core::compile_tex(path.clone(), content.clone(), None, Some(tx))
         });
 
-        gpui::App::spawn(&*cx, async move |mut cx| {
+        gpui::App::spawn(&*cx, async move |cx| {
             while let Some(line) = rx.recv().await {
                 if let Some(e) = this.upgrade() {
                     e.update(cx, |app, cx| {
@@ -840,7 +841,7 @@ impl TikzForgeApp {
         };
         let dark = self.theme == Theme::Dark;
         for doc in &self.docs {
-            let _ = doc.editor.update(cx, |e, cx| e.set_dark(dark, cx));
+            doc.editor.update(cx, |e, cx| e.set_dark(dark, cx));
         }
         self.persist();
         cx.notify();
@@ -972,7 +973,7 @@ impl TikzForgeApp {
         let id = self.toast_counter;
         self.toasts.push(Toast { id, kind, message });
         let this = cx.weak_entity();
-        gpui::App::spawn(&*cx, async move |mut cx| {
+        gpui::App::spawn(&*cx, async move |cx| {
             Timer::after(Duration::from_secs(3)).await;
             if let Some(e) = this.upgrade() {
                 e.update(cx, |app, cx| {
@@ -1029,7 +1030,7 @@ impl TikzForgeApp {
         self.updater_status = "Checking...".to_string();
         cx.notify();
         let this = cx.weak_entity();
-        gpui::App::spawn(&*cx, async move |mut cx| {
+        gpui::App::spawn(&*cx, async move |cx| {
             let status = cx
                 .background_executor()
                 .spawn(async move {
@@ -1215,7 +1216,7 @@ impl Render for TikzForgeApp {
                     .hover(|s| s.bg(rgb(theme.bg())))
                     .text_sm()
                     .child("Compile")
-                    .on_click(cx.listener(|this, _, window, cx| this.compile_current(cx))),
+                    .on_click(cx.listener(|this, _, _window, cx| this.compile_current(cx))),
             )
             .child(
                 div()
@@ -1802,17 +1803,15 @@ impl Render for TikzForgeApp {
                         cx.notify();
                         return;
                     }
-                    if !ks.modifiers.control && !ks.modifiers.alt {
-                        if let Some(ch) = &ks.key_char {
-                            if !ch.is_empty() {
-                                this.palette_query.push_str(ch);
-                                this.palette_selected = 0;
-                                cx.notify();
-                                return;
-                            }
-                        }
+                    if !ks.modifiers.control
+                        && !ks.modifiers.alt
+                        && let Some(ch) = &ks.key_char
+                        && !ch.is_empty()
+                    {
+                        this.palette_query.push_str(ch);
+                        this.palette_selected = 0;
+                        cx.notify();
                     }
-                    return;
                 }
             }))
             .on_action(cx.listener(|this, _: &Save, window, cx| this.save(window, cx)))
@@ -1820,7 +1819,7 @@ impl Render for TikzForgeApp {
             .on_action(
                 cx.listener(|this, _: &ToggleTheme, window, cx| this.toggle_theme(window, cx)),
             )
-            .on_action(cx.listener(|this, _: &Compile, window, cx| this.compile_current(cx)))
+            .on_action(cx.listener(|this, _: &Compile, _window, cx| this.compile_current(cx)))
             .on_action(cx.listener(|this, _: &ViewSplit, window, cx| {
                 this.set_view(ViewMode::Split, window, cx)
             }))
@@ -1941,4 +1940,45 @@ fn main() {
 
         cx.activate(true);
     });
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{Persisted, TikzForgeApp, ViewMode, find_source_position, parse_synctex};
+    use gpui::AppContext;
+
+    #[test]
+    fn app_constructs() {
+        let mut cx = gpui::TestAppContext::single();
+        let persisted = Persisted::default();
+        let app = cx.new(|cx| TikzForgeApp::new(cx, persisted));
+        cx.update(|appcx| {
+            let a = app.read(appcx);
+            assert_eq!(a.docs.len(), 1);
+            assert_eq!(a.view_mode, ViewMode::Split);
+        });
+    }
+
+    #[test]
+    fn parse_compile_result_errors() {
+        let mut cx = gpui::TestAppContext::single();
+        let persisted = Persisted::default();
+        let app = cx.new(|cx| TikzForgeApp::new(cx, persisted));
+        cx.update(|appcx| {
+            app.update(appcx, |app, _cx| {
+                app.log_text = "error at l.7 foo\nerror at l.12 bar".to_string();
+                app.parse_errors();
+                assert!(!app.errors.is_empty());
+                assert_eq!(app.errors[0].line, 7);
+            });
+        });
+    }
+
+    #[test]
+    fn synctex_parse_round_trip() {
+        let content = "1 10 20 5 0\n2 30 40 6 0\n";
+        let recs = parse_synctex(content);
+        assert_eq!(recs.len(), 2);
+        assert_eq!(find_source_position(&recs, 1, 10, 20), Some(5));
+    }
 }

@@ -1,4 +1,3 @@
-use std::path::PathBuf;
 use tauri::Emitter;
 use tauri::Manager;
 
@@ -8,7 +7,7 @@ async fn compile_tex(
     path: String,
     content: String,
 ) -> Result<tikzforge_core::compile::CompileResult, String> {
-    let resource_dir = handle.path().resource_dir().ok().map(PathBuf::from);
+    let resource_dir = handle.path().resource_dir().ok();
     let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel::<String>();
 
     let handle_clone = handle.clone();
@@ -31,7 +30,7 @@ fn cancel_compile() {
 
 #[tauri::command]
 fn detect_engine(handle: tauri::AppHandle) -> Option<String> {
-    let resource_dir = handle.path().resource_dir().ok().map(PathBuf::from);
+    let resource_dir = handle.path().resource_dir().ok();
     let engine = tikzforge_core::texlive_resolver::resolve_engine(resource_dir);
     if engine.path.is_file() {
         Some(engine.path.to_string_lossy().into_owned())
