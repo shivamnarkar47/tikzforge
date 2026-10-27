@@ -15,3 +15,10 @@ rfd = "0.16"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 dirs = "5"
+ropey = { version = "2.0.0-beta.1", features = ["metric_chars"] }
+tree-sitter = "0.27.1"
+codebook-tree-sitter-latex = "0.6.1"
+pdfium-bundled = "0.2.0"
+pdfium-render = "0.9"
+image = "0.25.10"
+smallvec = "1"
