@@ -583,7 +583,11 @@ fn main() {
                 titlebar: None,
                 ..Default::default()
             },
-            |_, _cx| view_handle.clone(),
+            |window, cx| {
+                let view = view_handle.clone();
+                view.read(cx).focus_handle(cx).focus(window);
+                view
+            },
         )
         .unwrap();
 
