@@ -2,7 +2,7 @@ use flate2::read::GzDecoder;
 use serde::Serialize;
 use std::fs;
 use std::io::{BufRead, BufReader, Read};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::process::{Child, Command, ExitStatus, Stdio};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
@@ -100,10 +100,10 @@ pub struct CompileResult {
 pub fn resolve_tex_path(path: &str) -> Result<PathBuf, String> {
     let candidate = PathBuf::from(path);
     if candidate.is_absolute() {
-        if let Some(parent) = candidate.parent() {
-            if !parent.as_os_str().is_empty() {
-                fs::create_dir_all(parent).map_err(|e| e.to_string())?;
-            }
+        if let Some(parent) = candidate.parent()
+            && !parent.as_os_str().is_empty()
+        {
+            fs::create_dir_all(parent).map_err(|e| e.to_string())?;
         }
         return Ok(candidate);
     }
@@ -131,7 +131,7 @@ pub fn compile_tex(
     let dir = tex_path
         .parent()
         .map(PathBuf::from)
-        .unwrap_or_else(|| std::env::temp_dir());
+        .unwrap_or_else(std::env::temp_dir);
     let file_name = tex_path
         .file_name()
         .map(|n| n.to_string_lossy().into_owned())

@@ -1,4 +1,4 @@
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 /// Platform that determines which bundled engine to use.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -18,7 +18,7 @@ pub struct Engine {
 ///
 /// All platforms: `<resource_dir>/tectonic/tectonic[.exe]`
 /// (Tauri's resource bundler preserves the relative layout of `tectonic/*`.)
-pub fn bundled_engine_path(resource_dir: &PathBuf, platform: Platform) -> PathBuf {
+pub fn bundled_engine_path(resource_dir: &Path, platform: Platform) -> PathBuf {
     let exe_name = match platform {
         Platform::Windows => "tectonic.exe",
         _ => "tectonic",
