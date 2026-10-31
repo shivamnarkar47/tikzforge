@@ -16,6 +16,7 @@ pkgbase = tikzforge
 	depends = wayland
 	depends = hicolor-icon-theme
 	depends = tectonic
+	options = !lto
 	source = tikzforge-0.4.0.tar.gz::https://github.com/shivamnarkar47/tikzforge/archive/refs/tags/v0.4.0.tar.gz
 	sha256sums = 843d5850f9133b1a96edfe428f6154bdfbbb7c0c9b799383adc2a83fce721f62
 
