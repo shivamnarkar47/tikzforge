@@ -1,52 +1,40 @@
 # Maintainer: TikzForge contributors
 pkgname=tikzforge
-pkgver=0.2.1
+pkgver=0.3.1
 pkgrel=1
 pkgdesc='Native TikZ/LaTeX editor with live PDF preview'
 arch=('x86_64')
 url='https://github.com/shivamnarkar47/tikzforge'
 license=('MIT')
-depends=('webkit2gtk-4.1' 'hicolor-icon-theme')
-makedepends=('bun' 'cargo' 'jq' 'patchelf' 'rust')
+depends=('gtk3' 'libxkbcommon-x11' 'vulkan-icd-loader' 'wayland' 'hicolor-icon-theme' 'tectonic')
+makedepends=('rust' 'clang' 'pkgconf' 'curl')
+install="$pkgname.install"
 source=("$pkgname-$pkgver.tar.gz::https://github.com/shivamnarkar47/tikzforge/archive/refs/tags/v$pkgver.tar.gz")
-sha256sums=('6eb23c9166662cdeab8335f440638213b27b6afb6982d8dfb9e536dfcc817f88')
-
-prepare() {
-  cd "$srcdir/$pkgname-$pkgver"
-
-  # Build the self-contained TeX engine from crates.io instead of asking
-  # users to install TeX Live separately. The resource is copied into the
-  # Tauri package below src-tauri/tectonic/.
-  local engine_root="$srcdir/tectonic-root"
-  CARGO_HOME="$srcdir/cargo-home" \
-    cargo install --locked --version 0.17.0 tectonic --root "$engine_root"
-  install -Dm755 "$engine_root/bin/tectonic" src-tauri/tectonic/tectonic
-
-  # The upstream base config leaves resources out for local development.
-  # Inject the staged engine so Tauri places it beside the installed app.
-  bash scripts/generate-tauri-config.sh --force
-}
+sha256sums=('74493423e693c5f62ca7ea75f6099f2929e2d4f3a3daca404ead355daeb5cf54')
 
 build() {
-  cd "$srcdir/$pkgname-$pkgver"
-
-  bun install --frozen-lockfile
-  bun run tauri build --bundles deb
+  cd "$pkgname-$pkgver"
+  cargo build --release --locked -p tikzforge-gpui
 }
 
 package() {
-  cd "$srcdir/$pkgname-$pkgver"
+  cd "$pkgname-$pkgver"
 
-  local deb
-  deb=(src-tauri/target/release/bundle/deb/*.deb)
-  if (( ${#deb[@]} != 1 )); then
-    error "Expected one Tauri Debian package, found ${#deb[@]}"
-    return 1
-  fi
+  install -Dm755 target/release/tikzforge-gpui "$pkgdir/usr/bin/tikzforge"
+  install -Dm644 LICENSE "$pkgdir/usr/share/licenses/$pkgname/LICENSE"
+  install -Dm644 legacy/src-tauri/icons/icon.png "$pkgdir/usr/share/icons/hicolor/512x512/apps/tikzforge.png"
+  install -Dm644 legacy/src-tauri/icons/32x32.png "$pkgdir/usr/share/icons/hicolor/32x32/apps/tikzforge.png"
 
-  mkdir -p "$srcdir/deb"
-  bsdtar -xf "${deb[0]}" -C "$srcdir/deb"
-  bsdtar -xf "$srcdir/deb/data.tar.gz" -C "$pkgdir"
+  install -d "$pkgdir/usr/share/applications"
+  cat > "$pkgdir/usr/share/applications/tikzforge.desktop" <<EOF
+[Desktop Entry]
+Type=Application
+Name=TikzForge
+Comment=Edit TikZ diagrams with live preview
+Exec=tikzforge %f
+Icon=tikzforge
+Terminal=false
+Categories=Development;Graphics;
+MimeType=text/x-tex;
+EOF
 }
-
-# vim: set ft=sh ts=2 sw=2 et:

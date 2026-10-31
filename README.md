@@ -5,7 +5,7 @@ A native desktop app for editing TikZ/LaTeX diagrams with live PDF preview.
 ## Features
 
 - **Live Preview** — Edit TikZ code, see the PDF update instantly
-- **Syntax Highlighting** — Custom LaTeX stream language for CodeMirror 6
+- **Syntax Highlighting** — tree-sitter LaTeX grammar
 - **Error Display** — Clickable error list with line numbers parsed from compilation logs
 - **Auto-Compile** — Configurable debounce (default 2s) after last keystroke
 - **Multi-Document Tabs** — Open multiple `.tex` files, each with its own compile state
@@ -16,8 +16,8 @@ A native desktop app for editing TikZ/LaTeX diagrams with live PDF preview.
 - **Dark/Light Theme** — Follows system theme by default, user override persisted
 - **State Persistence** — Window size, position, and divider position restored on relaunch
 - **SyncTeX Forward Sync** — `Ctrl+Click` on PDF to jump to source line
-- **LaTeX Engine Management** — Detect existing installation or download minimal TeX Live
-- **Auto-Updates** — Tauri updater checks for new versions on startup
+- **Bundled Tectonic** — Releases ship the Tectonic engine; a system `tectonic` on `PATH` also works
+- **Update Check** — Compares against the latest GitHub release
 
 ## Roadmap
 
@@ -27,9 +27,9 @@ Near-term (hooks exist, wiring in progress — see #10):
 - **SyncTeX end-to-end** — pass `--synctex` to the engine so `Ctrl+Click` jump-to-source works on real output
 - **Offline first compile** — ship a pre-warmed engine bundle; today the first build downloads engine data once, then caches
 - **Finish file workflows** — wire Auto-Save + unclean-shutdown restore offer, `Ctrl+O` / `Ctrl+S` shortcuts, and the tab-close guard into the UI
-- **Real auto-updater** — backend currently reports "no update"; connect Tauri updater + `.tex` file association
+- **Real auto-updater** — backend checks GitHub; add download/install flow and `.tex` file association
 - **Template library** — starter TikZ examples beyond the default template
-- **Close #10** — bundled-engine acceptance across AppImage + NSIS installers
+- **Close #10** — bundled-engine acceptance across release archives
 
 Later:
 
@@ -53,7 +53,18 @@ The legacy Tauri + React implementation is archived under `legacy/` for one rele
 - [Rust](https://www.rust-lang.org/tools/install) (stable)
 - Platform dependencies for GPUI (Linux: gtk/wayland/vulkan dev packages; see CI)
 
-### Installation
+### Install (prebuilt)
+
+Download the latest archive from
+[Releases](https://github.com/shivamnarkar47/tikzforge/releases/latest):
+
+- Linux: `tikzforge-gpui-*-linux-x86_64.tar.gz`
+- Windows: `tikzforge-gpui-*-windows-x86_64.zip`
+
+Extract it and keep the `tectonic/` folder next to the binary. Or run the
+installer from a clone: `./install.sh` (Linux) / `.\install.ps1` (Windows).
+
+### From source
 
 ```bash
 # Clone the repo

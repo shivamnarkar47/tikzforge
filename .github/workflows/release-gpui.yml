@@ -39,6 +39,12 @@ jobs:
       - name: Build GPUI binary
         run: cargo build -p tikzforge-gpui --release
 
+      - name: Stage icons
+        shell: bash
+        run: |
+          cp legacy/src-tauri/icons/icon.png target/release/tikzforge.png
+          cp legacy/src-tauri/icons/icon.ico target/release/tikzforge.ico
+
       - name: Stage bundled Tectonic (Linux)
         if: matrix.platform == 'ubuntu-latest'
         run: |
@@ -49,6 +55,7 @@ jobs:
 
       - name: Stage bundled Tectonic (Windows)
         if: matrix.platform == 'windows-latest'
+        shell: bash
         run: |
           bash scripts/prepare-texlive.sh windows
           mkdir -p target/release/tectonic
@@ -56,12 +63,12 @@ jobs:
 
       - name: Package (Linux)
         if: matrix.platform == 'ubuntu-latest'
-        run: tar -czf "tikzforge-gpui-${{ github.ref_name }}-linux-x86_64.tar.gz" -C target/release tikzforge-gpui tectonic
+        run: tar -czf "tikzforge-gpui-${{ github.ref_name }}-linux-x86_64.tar.gz" -C target/release tikzforge-gpui tectonic tikzforge.png
 
       - name: Package (Windows)
         if: matrix.platform == 'windows-latest'
         shell: pwsh
-        run: Compress-Archive -Path "target/release/tikzforge-gpui.exe", "target/release/tectonic" -DestinationPath "tikzforge-gpui-${{ github.ref_name }}-windows-x86_64.zip"
+        run: Compress-Archive -Path "target/release/tikzforge-gpui.exe", "target/release/tectonic", "target/release/tikzforge.ico" -DestinationPath "tikzforge-gpui-${{ github.ref_name }}-windows-x86_64.zip"
 
       - name: Upload artifact (Linux)
         if: matrix.platform == 'ubuntu-latest'

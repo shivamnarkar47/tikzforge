@@ -2,85 +2,66 @@
 
 ## Prerequisites
 
-- **bun** (package manager, script runner)
 - **Rust** (stable toolchain)
-- **Tauri CLI** (`bun add -d @tauri-apps/cli`)
-- **System deps** (Linux): `libgtk-3-dev libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf`
+- **System deps** (Linux): `gtk3`, `libxkbcommon-x11`, `wayland`, Vulkan
+  loader, `fontconfig`, `freetype2`, `harfbuzz`, `graphite`, `icu`,
+  `libpng`, `openssl`, `zlib`, `pkgconf`, `clang`
+- **Windows**: MSVC Rust toolchain
 
 ## Quick Start
 
 ```bash
-bun install
-bun run tauri dev          # dev mode (Vite + Tauri)
-bun run tauri build        # production build
+cargo run -p tikzforge-gpui
 ```
 
-## Output
+Production build:
 
-Production builds produce:
+```bash
+cargo build -p tikzforge-gpui --release
+```
 
-| Format | Path |
-|--------|------|
-| `.deb` | `src-tauri/target/release/bundle/deb/*.deb` |
-| `.rpm` | `src-tauri/target/release/bundle/rpm/*.rpm` |
-| AppImage | `src-tauri/target/release/bundle/appimage/*.AppImage` |
+Output: `target/release/tikzforge-gpui` (or `.exe` on Windows).
 
 ## Bundled Tectonic engine
 
-The app ships a self-contained Tectonic binary (~60MB, XeTeX-based, TikZ
-included) so compilation works on first launch with no separate LaTeX install.
-
-Stage it before building:
+Releases ship a self-contained Tectonic binary so compilation works without
+a separate LaTeX install. Stage it before packaging:
 
 ```bash
 bash scripts/prepare-texlive.sh linux      # or `windows`, or `all`
-bash scripts/generate-tauri-config.sh      # verifies the staged binary
-bun run tauri build
 ```
 
-`prepare-texlive.sh` downloads the pinned prebuilt release asset
-(Tectonic v0.17.0) and stages it under `src-tauri/tectonic/`.
-`tauri.conf.json` declares `tectonic/*` as bundled resources, so Tauri ships
-the binary inside the AppImage / NSIS installer. `generate-tauri-config.sh`
-fails fast if the binary is missing — without it the installer builds fine
-but the app reports "LaTeX not found" on launch.
+The script downloads the pinned prebuilt Tectonic release (v0.17.0) and
+stages it under `legacy/src-tauri/tectonic/`. For a portable build, place it
+next to the app binary:
 
-The staged `src-tauri/tectonic/` directory is gitignored and cached in CI.
-`tauri dev` picks the staged binary up automatically (it probes the source
-tree, since dev mode never bundles resources); installing Tectonic on PATH
-is only a last-resort fallback.
-
-Note: Tectonic fetches its TeX package bundle from the network on first
-compile and caches it locally, so the very first compile needs connectivity
-even though engine detection works offline.
-
-## AppImage builds on local Linux
-
-The AppImage step uses `linuxdeploy`, which Tauri caches at
-`~/.cache/tauri/linuxdeploy-x86_64.AppImage`. On newer Linux distros you may
-see:
-
-```
-ERROR: Strip call failed: ... unknown type [0x13] section `.relr.dyn'
-failed to run /home/<user>/.cache/tauri/linuxdeploy-x86_64.AppImage
+```bash
+mkdir -p target/release/tectonic
+cp legacy/src-tauri/tectonic/tectonic target/release/tectonic/
 ```
 
-The cached `linuxdeploy` contains an older `strip` that doesn't recognize
-RELR relocations (`.relr.dyn`) in modern shared libraries (libxml2, libxslt,
-libyuv, libzstd). The `.deb` and `.rpm` bundles still succeed — only AppImage
-is affected.
+At runtime `resolve_engine` probes `tectonic/` next to the executable, the
+source tree used by `cargo run`, then `tectonic` on `PATH`.
 
-Workarounds:
+Tectonic fetches its TeX package bundle from the network on first compile
+and caches it locally, so the first compile needs connectivity even though
+engine detection works offline.
 
-1. **Let CI produce the AppImage.** GitHub's `ubuntu-latest` runners have
-   older library versions where the cached linuxdeploy works fine. Tag a
-   release and grab the AppImage from the GitHub release.
-2. **Delete the cached binary** so Tauri re-downloads the latest:
-   ```bash
-   rm ~/.cache/tauri/linuxdeploy-x86_64.AppImage
-   ```
-3. **Install linuxdeploy from your package manager** and symlink it into
-   the cache path.
+## Release packaging
+
+`.github/workflows/release-gpui.yml` builds the app, stages Tectonic, and
+produces:
+
+| Platform | Asset |
+|----------|-------|
+| Linux | `tikzforge-gpui-<tag>-linux-x86_64.tar.gz` |
+| Windows | `tikzforge-gpui-<tag>-windows-x86_64.zip` |
+
+Both archives contain the binary, the `tectonic/` directory, and an icon.
+Extract and keep `tectonic/` next to the binary.
+
+`install.sh` and `install.ps1` install these archives for users. See
+`docs/release.md` for the release checklist and AUR packaging.
 
 ## Keyboard Shortcuts
 

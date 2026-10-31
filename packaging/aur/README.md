@@ -1,19 +1,18 @@
 # TikzForge AUR package
 
-This directory contains the release package definition for Arch Linux:
+This directory contains the Arch Linux package definition:
 
 ```bash
 cd packaging/aur
 makepkg -si
 ```
 
-The package builds TikzForge from the tagged GitHub source and compiles
-Tectonic `0.17.0` with Cargo during the package build. The resulting Tectonic
-binary is included in the installed package, so users do not need a separate
-TeX Live installation.
+The package builds the GPUI app from the tagged GitHub source and installs
+it as `/usr/bin/tikzforge`, with a desktop entry and icons. Tectonic is a
+runtime dependency (`tectonic` in the official repositories), so the app
+finds it on `PATH`.
 
-For an AUR submission, upload `PKGBUILD` and the generated `.SRCINFO` file to
-the `tikzforge` AUR repository. The package build dependencies (`bun`,
-`cargo`, `rust`, `jq`, `patchelf`, and the native Tauri dependencies) must be
-available on the build machine; the PKGBUILD does not install toolchains with
-`rustup`.
+For an AUR submission, upload `PKGBUILD`, `.SRCINFO`, and
+`tikzforge.install` to the `tikzforge` AUR repository. Build dependencies
+are `rust`, `clang`, `pkgconf`, and `curl`; the PKGBUILD does not install
+toolchains with `rustup`.
