@@ -1,6 +1,6 @@
 # Maintainer: TikzForge contributors
 pkgname=tikzforge
-pkgver=0.3.1
+pkgver=0.4.0
 pkgrel=1
 pkgdesc='Native TikZ/LaTeX editor with live PDF preview'
 arch=('x86_64')
@@ -10,7 +10,7 @@ depends=('gtk3' 'libxkbcommon-x11' 'vulkan-icd-loader' 'wayland' 'hicolor-icon-t
 makedepends=('rust' 'clang' 'pkgconf' 'curl')
 install="$pkgname.install"
 source=("$pkgname-$pkgver.tar.gz::https://github.com/shivamnarkar47/tikzforge/archive/refs/tags/v$pkgver.tar.gz")
-sha256sums=('74493423e693c5f62ca7ea75f6099f2929e2d4f3a3daca404ead355daeb5cf54')
+sha256sums=('843d5850f9133b1a96edfe428f6154bdfbbb7c0c9b799383adc2a83fce721f62')
 
 build() {
   cd "$pkgname-$pkgver"
