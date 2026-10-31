@@ -39,25 +39,49 @@ jobs:
       - name: Build GPUI binary
         run: cargo build -p tikzforge-gpui --release
 
+      - name: Stage bundled Tectonic (Linux)
+        if: matrix.platform == 'ubuntu-latest'
+        run: |
+          bash scripts/prepare-texlive.sh linux
+          mkdir -p target/release/tectonic
+          cp legacy/src-tauri/tectonic/tectonic target/release/tectonic/tectonic
+          chmod +x target/release/tectonic/tectonic
+
+      - name: Stage bundled Tectonic (Windows)
+        if: matrix.platform == 'windows-latest'
+        run: |
+          bash scripts/prepare-texlive.sh windows
+          mkdir -p target/release/tectonic
+          cp legacy/src-tauri/tectonic/tectonic.exe target/release/tectonic/tectonic.exe
+
+      - name: Package (Linux)
+        if: matrix.platform == 'ubuntu-latest'
+        run: tar -czf "tikzforge-gpui-${{ github.ref_name }}-linux-x86_64.tar.gz" -C target/release tikzforge-gpui tectonic
+
+      - name: Package (Windows)
+        if: matrix.platform == 'windows-latest'
+        shell: pwsh
+        run: Compress-Archive -Path "target/release/tikzforge-gpui.exe", "target/release/tectonic" -DestinationPath "tikzforge-gpui-${{ github.ref_name }}-windows-x86_64.zip"
+
       - name: Upload artifact (Linux)
         if: matrix.platform == 'ubuntu-latest'
         uses: actions/upload-artifact@v4
         with:
           name: tikzforge-gpui-linux
-          path: target/release/tikzforge-gpui
+          path: tikzforge-gpui-${{ github.ref_name }}-linux-x86_64.tar.gz
 
       - name: Upload artifact (Windows)
         if: matrix.platform == 'windows-latest'
         uses: actions/upload-artifact@v4
         with:
           name: tikzforge-gpui-windows
-          path: target/release/tikzforge-gpui.exe
+          path: tikzforge-gpui-${{ github.ref_name }}-windows-x86_64.zip
 
       - name: Create Release (Linux)
         if: matrix.platform == 'ubuntu-latest'
         uses: softprops/action-gh-release@v2
         with:
-          files: target/release/tikzforge-gpui
+          files: tikzforge-gpui-${{ github.ref_name }}-linux-x86_64.tar.gz
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -65,6 +89,6 @@ jobs:
         if: matrix.platform == 'windows-latest'
         uses: softprops/action-gh-release@v2
         with:
-          files: target/release/tikzforge-gpui.exe
+          files: tikzforge-gpui-${{ github.ref_name }}-windows-x86_64.zip
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
