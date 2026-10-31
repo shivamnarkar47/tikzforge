@@ -31,6 +31,7 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y \
+            libgtk-3-dev \
             libfontconfig1-dev libgraphite2-dev libharfbuzz-dev libicu-dev \
             libpng-dev libssl-dev pkg-config zlib1g-dev patchelf \
             libxkbcommon-dev libwayland-dev libvulkan-dev clang
