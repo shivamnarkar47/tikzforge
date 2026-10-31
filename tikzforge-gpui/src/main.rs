@@ -645,7 +645,7 @@ impl TikzForgeApp {
         };
         let rgba = bitmap.as_rgba_bytes();
         let mut bgra = rgba;
-        for chunk in bgra.chunks_exact_mut(4) {
+        for chunk in bgra.as_chunks_mut::<4>().0 {
             chunk.swap(0, 2);
         }
         self.page_count = page_count as usize;
