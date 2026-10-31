@@ -1,11 +1,11 @@
 #![recursion_limit = "512"]
-mod commands;
 mod editor;
 
 use editor::Editor;
 use editor::EditorEvent;
 use gpui::prelude::FluentBuilder;
 use gpui::*;
+use gpui_component::{Root, ThemeMode};
 use pdfium_bundled::bind_pdfium_silent;
 use pdfium_bundled::pdfium_render::prelude::Pdfium;
 use serde::{Deserialize, Serialize};
@@ -1870,6 +1870,7 @@ fn quit_app(_action: &QuitApp, cx: &mut App) {
 
 fn main() {
     Application::new().run(|cx: &mut App| {
+        gpui_component::init(cx);
         cx.on_action(quit_app);
         cx.set_menus(vec![Menu {
             name: "TikzForge".into(),
@@ -1888,12 +1889,18 @@ fn main() {
             KeyBinding::new("ctrl-s", Save, None),
             KeyBinding::new("ctrl-o", Open, None),
             KeyBinding::new("ctrl-enter", Compile, None),
+            KeyBinding::new("ctrl-enter", Compile, Some("Input")),
             KeyBinding::new("ctrl-k", CommandPalette, None),
             KeyBinding::new("ctrl-n", NewDocument, None),
             KeyBinding::new("ctrl-w", CloseTab, None),
         ]);
 
         let persisted2 = load_persisted();
+        gpui_component::Theme::global_mut(cx).mode = if persisted2.dark {
+            ThemeMode::Dark
+        } else {
+            ThemeMode::Light
+        };
         let bounds = if let (Some(x), Some(y), Some(w), Some(h)) = (
             persisted2.window_x,
             persisted2.window_y,
@@ -1932,8 +1939,9 @@ fn main() {
             },
             |window, cx| {
                 let view = view_handle.clone();
+                let root = cx.new(|cx| Root::new(view.clone(), window, cx));
                 view.read(cx).focus_handle(cx).focus(window);
-                view
+                root
             },
         )
         .unwrap();
@@ -1946,6 +1954,19 @@ fn main() {
 mod tests {
     use super::{Persisted, TikzForgeApp, ViewMode, find_source_position, parse_synctex};
     use gpui::AppContext;
+
+    #[test]
+    fn app_renders() {
+        let mut cx = gpui::TestAppContext::single();
+        cx.update(|cx| gpui_component::init(cx));
+        let (_, visual) = cx.add_window_view(|window, cx| {
+            let app = cx.new(|cx| TikzForgeApp::new(cx, Persisted::default()));
+            gpui_component::Root::new(app, window, cx)
+        });
+        visual.update(|window, cx| {
+            let _ = window.draw(cx);
+        });
+    }
 
     #[test]
     fn app_constructs() {
