@@ -1,6 +1,6 @@
 [package]
 name = "tikzforge-core"
-version = "0.3.1"
+version = "0.4.0"
 description = "Pure Rust backend logic for TikzForge (compile, engine detection, synctex, persistence helpers)"
 edition = "2024"
 

@@ -6,7 +6,7 @@
 #
 # Usage:
 #   .\install.ps1                 # install latest
-#   .\install.ps1 -Version v0.3.1 # install specific version
+#   .\install.ps1 -Version v0.4.0 # install specific version
 #   .\install.ps1 -Check          # print latest version, don't install
 
 param(

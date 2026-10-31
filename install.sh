@@ -7,7 +7,7 @@
 #
 # Usage:
 #   ./install.sh                 # install latest
-#   ./install.sh v0.3.1          # install specific version
+#   ./install.sh v0.4.0          # install specific version
 #   ./install.sh --check         # print latest version, don't install
 
 set -euo pipefail

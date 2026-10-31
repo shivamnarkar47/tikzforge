@@ -29,11 +29,11 @@ of a GPUI release.
 2. **Commit** the bump:
    ```bash
    git add Cargo.lock tikzforge-core/Cargo.toml tikzforge-gpui/Cargo.toml
-   git commit -m "chore: bump version to 0.3.2"
+   git commit -m "chore: bump version to 0.4.0"
    ```
 3. **Tag** the commit with a `v`-prefixed version:
    ```bash
-   git tag v0.3.2
+   git tag v0.4.0
    ```
 4. **Push** the commit and the tag:
    ```bash

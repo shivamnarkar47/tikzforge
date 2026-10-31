@@ -6242,7 +6242,7 @@ dependencies = [
 
 [[package]]
 name = "tikzforge-core"
-version = "0.3.1"
+version = "0.4.0"
 dependencies = [
  "flate2",
  "serde",
@@ -6252,7 +6252,7 @@ dependencies = [
 
 [[package]]
 name = "tikzforge-gpui"
-version = "0.3.1"
+version = "0.4.0"
 dependencies = [
  "codebook-tree-sitter-latex",
  "dirs 5.0.1",
