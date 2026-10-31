@@ -207,7 +207,7 @@ Pushing a \texttt{v*} tag triggers \texttt{.github/workflows/release.yml}, which
 \end{itemize}
 
 % ============================================================
-\chapter{Future Scope: Migrating to GPUI}
+\chapter{GPUI Migration (Complete)}
 % ============================================================
 
 \section{What is GPUI?}
@@ -232,21 +232,22 @@ GPUI is Zed's Rust-native UI framework: a GPU-accelerated, immediate-mode-ish re
 
 \section{Migration Strategy (Phased)}
 \begin{enumerate}
-  \item \textbf{Phase 1 — Backend parity}: keep Tauri, but move more logic to Rust (already mostly there). No UI change.
-  \item \textbf{Phase 2 — GPUI shell prototype}: build a minimal GPUI window rendering the toolbar and a text area; validate rendering and input handling.
-  \item \textbf{Phase 3 — Editor port}: implement LaTeX highlighting and basic editing in GPUI (or embed a Rust editor crate such as \texttt{helix-core}/\texttt{lapce-core}).
-  \item \textbf{Phase 4 — PDF viewer}: integrate a Rust PDF renderer and SyncTeX mapping.
-  \item \textbf{Phase 5 — Feature parity}: tabs, theming, persistence, updater, dialogs.
-  \item \textbf{Phase 6 — Cutover}: replace Tauri frontend entirely; retire webview.
+  \item \textbf{Phase 1 — Backend parity} (COMPLETE): pure Rust backend extracted into the \texttt{tikzforge-core} workspace crate (compile, engine detection, SyncTeX); Tauri app depended on it.
+  \item \textbf{Phase 2 — GPUI shell} (COMPLETE): GPUI window with chrome, theming, persistence, shortcuts.
+  \item \textbf{Phase 3 — Editor port} (COMPLETE): ropey text buffer, tree-sitter-latex highlighting, search, autocomplete, folding.
+  \item \textbf{Phase 4 — PDF viewer} (COMPLETE): pdfium rendering with SyncTeX.
+  \item \textbf{Phase 5 — Feature parity} (COMPLETE): tabs, command palette, toasts, auto-compile, engine gate, recent files, error list, updater, persistence.
+  \item \textbf{Phase 6 — Testing \& hardening} (COMPLETE): Rust test suite, QA checklist.
+  \item \textbf{Phase 7 — Cutover} (COMPLETE): GPUI is the shipped binary; Tauri + React archived under \texttt{legacy/}.
 \end{enumerate}
 
-\section{Recommendation}
-GPUI is a compelling long-term direction for performance and native feel, but the cost of reimplementing the editor and PDF viewer is high. A pragmatic path is to \textbf{keep Tauri + React for now} (maximizing iteration speed and leveraging CodeMirror/PDF.js) and revisit GPUI once the product is feature-complete and performance bottlenecks are measured. A hybrid approach — GPUI for the chrome, webview for the editor — is also possible but adds complexity.
+\section{Status}
+The migration to GPUI is \textbf{complete}. TikzForge now ships as a native Rust application on GPUI (no webview). The previous Tauri + React implementation is preserved under \texttt{legacy/} for one release cycle and on the \texttt{archive/tauri-react-0.2.1} branch.
 
 % ============================================================
 \chapter{Conclusion}
 % ============================================================
 
-TikzForge delivers a focused, native desktop LaTeX/TikZ editing experience by combining Tauri's small footprint with React's rich ecosystem. The architecture keeps the UI responsive, the compile pipeline robust, and the UX polished (auto-compile, SyncTeX, error navigation, theming). Future work includes full template libraries, multi-file projects, macOS support, and a potential long-term migration to a native Rust UI (GPUI).
+TikzForge delivers a focused, native desktop LaTeX/TikZ editing experience built entirely in Rust on GPUI. The architecture keeps the UI responsive, the compile pipeline robust, and the UX polished (auto-compile, SyncTeX, error navigation, theming). The previous Tauri + React implementation is archived under \texttt{legacy/}. Future work includes full template libraries, multi-file projects, and macOS support.
 
 \end{document}

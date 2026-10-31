@@ -1,0 +1,26 @@
+[package]
+name = "tikzforge-gpui"
+version = "0.2.1"
+description = "TikzForge GPUI app"
+edition = "2024"
+
+[[bin]]
+name = "tikzforge-gpui"
+path = "src/main.rs"
+
+[dependencies]
+tikzforge-core = { path = "../tikzforge-core" }
+gpui = { version = "0.2.2", features = ["test-support"] }
+rfd = { version = "0.16", default-features = false, features = ["gtk3"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+dirs = "5"
+ropey = { version = "2.0.0-beta.1", features = ["metric_chars"] }
+tree-sitter = "0.27.1"
+codebook-tree-sitter-latex = "0.6.1"
+pdfium-bundled = "0.2.0"
+pdfium-render = "0.9"
+image = "0.25.10"
+smallvec = "1"
+ureq = "3"
+tokio = { version = "1", features = ["sync"] }

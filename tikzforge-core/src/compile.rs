@@ -1,5 +1,3 @@
-mod texlive_resolver;
-
 use flate2::read::GzDecoder;
 use serde::Serialize;
 use std::fs;
@@ -9,27 +7,22 @@ use std::process::{Child, Command, ExitStatus, Stdio};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
-use tauri::Emitter;
+use tokio::sync::mpsc;
 
 /// Tauri event carrying one engine output line while a compile runs.
-const COMPILE_LOG_EVENT: &str = "compile-log";
+/// (Hosts may forward channel lines under their own event name.)
+pub const COMPILE_LOG_CHANNEL: &str = "compile-log";
 
 /// How long a single Tectonic run may take before it is killed.
-/// First-ever compiles download the engine bundle and fonts (minutes on slow
-/// links); normal documents finish in seconds. Without a ceiling a stalled
-/// download blocks the UI spinner forever.
 const COMPILE_TIMEOUT: Duration = Duration::from_secs(10 * 60);
 
 /// Monotonic compile generation. Every `compile_tex` start and every
-/// `cancel_compile` bumps it; a running compile whose generation no longer
-/// matches is superseded and kills its child. Last starter always wins, so —
-/// unlike the previous cancel flag — execution order across Tauri's command
-/// threadpool cannot make a compile kill itself.
-static COMPILE_GEN: AtomicU64 = AtomicU64::new(0);
+/// `cancel_compile` bumps it.
+pub static COMPILE_GEN: AtomicU64 = AtomicU64::new(0);
 
 /// Outcome of running the engine process with a timeout.
 #[derive(Debug)]
-enum RunOutcome {
+pub enum RunOutcome {
     Finished(ExitStatus),
     TimedOut,
     Cancelled,
@@ -37,8 +30,7 @@ enum RunOutcome {
 
 /// Wait for `child` (whose pipes are drained elsewhere), killing it if
 /// `timeout` elapses or a newer compile generation supersedes `my_gen`.
-/// Always reaps the process.
-fn run_with_timeout(
+pub fn run_with_timeout(
     child: &mut Child,
     timeout: Duration,
     current_gen: &AtomicU64,
@@ -64,13 +56,11 @@ fn run_with_timeout(
 }
 
 /// Drain one engine pipe on a background thread: append every line to the
-/// shared transcript and forward it to the frontend as a `compile-log`
-/// event. Returns the thread handle so the caller can join it (pipes hit
-/// EOF once the child exits) before reading the finished transcript.
+/// shared transcript and forward it via `log_tx`.
 fn spawn_log_streamer<R>(
     stream: Option<R>,
-    handle: tauri::AppHandle,
     transcript: Arc<Mutex<String>>,
+    log_tx: Option<mpsc::UnboundedSender<String>>,
 ) -> Option<std::thread::JoinHandle<()>>
 where
     R: Read + Send + 'static,
@@ -89,7 +79,9 @@ where
                             t.push_str(&text);
                             t.push('\n');
                         }
-                        let _ = handle.emit(COMPILE_LOG_EVENT, text);
+                        if let Some(tx) = &log_tx {
+                            let _ = tx.send(text);
+                        }
                     }
                 }
             }
@@ -97,23 +89,21 @@ where
     })
 }
 
-#[derive(Serialize)]
-struct CompileResult {
-    pdf: Option<Vec<u8>>,
-    log: String,
-    success: bool,
+#[derive(Serialize, Clone)]
+pub struct CompileResult {
+    pub pdf: Option<Vec<u8>>,
+    pub log: String,
+    pub success: bool,
 }
 
-/// Resolve where to write the .tex file. Absolute paths are used as-is;
-/// bare filenames go into a scratch dir so browser-style names like
-/// "untitled.tex" still compile.
-fn resolve_tex_path(path: &str) -> Result<PathBuf, String> {
+/// Resolve where to write the .tex file.
+pub fn resolve_tex_path(path: &str) -> Result<PathBuf, String> {
     let candidate = PathBuf::from(path);
     if candidate.is_absolute() {
-        if let Some(parent) = candidate.parent() {
-            if !parent.as_os_str().is_empty() {
-                fs::create_dir_all(parent).map_err(|e| e.to_string())?;
-            }
+        if let Some(parent) = candidate.parent()
+            && !parent.as_os_str().is_empty()
+        {
+            fs::create_dir_all(parent).map_err(|e| e.to_string())?;
         }
         return Ok(candidate);
     }
@@ -127,14 +117,13 @@ fn resolve_tex_path(path: &str) -> Result<PathBuf, String> {
     Ok(dir.join(file_name))
 }
 
-/// Resolve which engine to use. Tectonic on all platforms.
-fn resolve_engine(handle: &tauri::AppHandle) -> texlive_resolver::Engine {
-    texlive_resolver::resolve_engine(handle)
-}
-
-#[tauri::command]
-fn compile_tex(handle: tauri::AppHandle, path: String, content: String) -> Result<CompileResult, String> {
-    // A new compile supersedes any previous one still running.
+/// Synchronous compile implementation.
+pub fn compile_tex(
+    path: String,
+    content: String,
+    resource_dir: Option<PathBuf>,
+    log_tx: Option<mpsc::UnboundedSender<String>>,
+) -> Result<CompileResult, String> {
     let my_gen = COMPILE_GEN.fetch_add(1, Ordering::SeqCst) + 1;
     let tex_path = resolve_tex_path(&path)?;
     fs::write(&tex_path, content).map_err(|e| e.to_string())?;
@@ -142,15 +131,13 @@ fn compile_tex(handle: tauri::AppHandle, path: String, content: String) -> Resul
     let dir = tex_path
         .parent()
         .map(PathBuf::from)
-        .unwrap_or_else(|| std::env::temp_dir());
+        .unwrap_or_else(std::env::temp_dir);
     let file_name = tex_path
         .file_name()
         .map(|n| n.to_string_lossy().into_owned())
         .unwrap_or_else(|| "untitled.tex".to_string());
 
-    let engine = resolve_engine(&handle);
-    // Tectonic is self-contained: handles its own dependency downloads and
-    // produces a single-pass PDF. Enable SyncTeX data (--synctex=1 equivalent).
+    let engine = crate::texlive_resolver::resolve_engine(resource_dir);
     let mut child = Command::new(&engine.path)
         .arg("--synctex")
         .arg(&file_name)
@@ -160,20 +147,10 @@ fn compile_tex(handle: tauri::AppHandle, path: String, content: String) -> Resul
         .spawn()
         .map_err(|e| format!("Failed to run Tectonic: {e}"))?;
 
-    // Stream both pipes live: each line goes to the shared transcript and to
-    // the frontend as a `compile-log` event. Join the threads (EOF follows
-    // child exit) before reading the finished transcript.
     let transcript = Arc::new(Mutex::new(String::new()));
-    let out_reader = spawn_log_streamer(
-        child.stdout.take(),
-        handle.clone(),
-        Arc::clone(&transcript),
-    );
-    let err_reader = spawn_log_streamer(
-        child.stderr.take(),
-        handle.clone(),
-        Arc::clone(&transcript),
-    );
+    let out_reader =
+        spawn_log_streamer(child.stdout.take(), Arc::clone(&transcript), log_tx.clone());
+    let err_reader = spawn_log_streamer(child.stderr.take(), Arc::clone(&transcript), log_tx);
 
     let outcome = run_with_timeout(&mut child, COMPILE_TIMEOUT, &COMPILE_GEN, my_gen)
         .map_err(|e| format!("Failed while running Tectonic: {e}"))?;
@@ -212,63 +189,33 @@ fn compile_tex(handle: tauri::AppHandle, path: String, content: String) -> Resul
     }
 }
 
-/// Request cancellation of the running compile, if any: bumps the compile
-/// generation so the running `compile_tex` observes the mismatch within
-/// milliseconds, kills Tectonic, and returns a "cancelled" result.
-/// Fire-and-forget safe: bumping with no compile running is a no-op.
-#[tauri::command]
-fn cancel_compile() {
+/// Request cancellation of the running compile.
+pub fn cancel_compile() {
     COMPILE_GEN.fetch_add(1, Ordering::SeqCst);
 }
 
-/// Report the bundled engine path if it exists, else fall back to PATH.
-#[tauri::command]
-fn detect_engine(handle: tauri::AppHandle) -> Option<String> {
-    let engine = resolve_engine(&handle);
-    if engine.path.is_file() {
-        Some(engine.path.to_string_lossy().into_owned())
-    } else {
-        None
-    }
+/// Async wrapper exposing the compile via tokio channels.
+pub async fn compile_tex_async(
+    path: String,
+    content: String,
+    resource_dir: Option<PathBuf>,
+    log_tx: Option<mpsc::UnboundedSender<String>>,
+) -> Result<CompileResult, String> {
+    tokio::task::spawn_blocking(move || compile_tex(path, content, resource_dir, log_tx))
+        .await
+        .map_err(|e| format!("compile task failed: {e}"))?
 }
 
-/// Decompress and read a .synctex.gz file for forward SyncTeX.
-#[tauri::command]
-fn read_synctex(path: String) -> Result<String, String> {
-    let bytes = fs::read(&path).map_err(|e| e.to_string())?;
+/// Decompress and read a .synctex.gz file.
+pub fn read_synctex(path: &str) -> Result<String, String> {
+    let bytes = fs::read(path).map_err(|e| e.to_string())?;
     let mut decoder = GzDecoder::new(&bytes[..]);
     let mut content = String::new();
     decoder.read_to_string(&mut content).map_err(|e| {
-        format!("Failed to decompress {}: {e}", PathBuf::from(&path).display())
+        format!(
+            "Failed to decompress {}: {e}",
+            PathBuf::from(path).display()
+        )
     })?;
     Ok(content)
-}
-
-#[derive(Serialize)]
-struct UpdateInfo {
-    available: bool,
-}
-
-/// Update checks are not wired up yet; report "no update" instead of failing.
-#[tauri::command]
-fn check_update() -> UpdateInfo {
-    UpdateInfo { available: false }
-}
-
-#[cfg_attr(mobile, tauri::mobile_entry_point)]
-pub fn run() {
-    tauri::Builder::default()
-        .plugin(tauri_plugin_opener::init())
-        .plugin(tauri_plugin_fs::init())
-        .plugin(tauri_plugin_dialog::init())
-        .plugin(tauri_plugin_updater::Builder::new().build())
-        .invoke_handler(tauri::generate_handler![
-            compile_tex,
-            cancel_compile,
-            detect_engine,
-            read_synctex,
-            check_update
-        ])
-        .run(tauri::generate_context!())
-        .expect("error while running tauri application");
 }

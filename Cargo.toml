@@ -1,0 +1,18 @@
+[workspace]
+resolver = "2"
+members = [
+    "tikzforge-core",
+    "tikzforge-gpui",
+]
+default-members = ["tikzforge-gpui"]
+exclude = ["legacy/src-tauri"]
+
+[patch.crates-io]
+xattr = { path = "patches/xattr-0.2.3" }
+
+[profile.release]
+codegen-units = 1
+lto = true
+opt-level = 3
+panic = "abort"
+strip = true
